@@ -432,16 +432,13 @@
                     <i class="fas fa-home"></i> Dashboard
                 </a>
                 <a href="#" class="nav-item" data-section="text-input">
-                    <i class="fas fa-keyboard"></i> Text eingeben
+                    <i class="fas fa-question-circle"></i> Aufgabe Erklären
                 </a>
                 <a href="#" class="nav-item" data-section="image-upload">
-                    <i class="fas fa-image"></i> Bild hochladen
+                    <i class="fas fa-check-circle"></i> Aufgabe korrigieren
                 </a>
                 <a href="#" class="nav-item" data-section="generate-task">
                     <i class="fas fa-magic"></i> Aufgabe generieren
-                </a>
-                <a href="#" class="nav-item" data-section="abi-generate">
-                    <i class="fas fa-graduation-cap"></i> Abitur-Modus
                 </a>
             </nav>
             <div class="sidebar-stats">
@@ -528,20 +525,16 @@
                     Dashboard
                 </button>
                 <button class="tab-btn" data-tab="text-input">
-                    <i class="fas fa-keyboard"></i>
-                    Text
+                    <i class="fas fa-question-circle"></i>
+                    Erklären
                 </button>
                 <button class="tab-btn" data-tab="image-upload">
-                    <i class="fas fa-image"></i>
-                    Bild
+                    <i class="fas fa-check-circle"></i>
+                    Korrigieren
                 </button>
                 <button class="tab-btn" data-tab="generate-task">
                     <i class="fas fa-magic"></i>
                     Generieren
-                </button>
-                <button class="tab-btn" data-tab="abi-generate">
-                    <i class="fas fa-graduation-cap"></i>
-                    Abitur
                 </button>
                 <button class="tab-btn" data-tab="user-profile">
                     <i class="fas fa-user"></i>
@@ -593,23 +586,23 @@
                 </div>
             </section>
 
-                <!-- Text Input Tab -->
+                <!-- Text Input Tab - Aufgabe Erklären -->
                 <section class="tab-content" id="text-input">
                     <div class="input-container">
                         <div class="input-header">
-                            <h3>Mathematik-Aufgabe eingeben</h3>
-                            <p>Gib deine Mathematik-Aufgabe oder -Frage hier ein:</p>
+                            <h3>Aufgabe Erklären</h3>
+                            <p>Stelle deine Mathematik-Frage und lass sie dir verständlich erklären:</p>
                         </div>
                         <div class="text-input-area">
                             <textarea 
                                 id="math-input" 
-                                placeholder="Beispiel: Löse die Gleichung 2x + 5 = 13 oder erkläre mir die Ableitung von x²..."
+                                placeholder="Beispiel: Erkläre mir die Ableitung von x² oder Wie löse ich die Gleichung 2x + 5 = 13?"
                                 rows="6"
                             ></textarea>
                             <div class="input-actions">
                                 <button class="btn btn-primary" id="analyze-btn">
-                                    <i class="fas fa-brain"></i>
-                                    Mit KI analysieren
+                                    <i class="fas fa-lightbulb"></i>
+                                    Erklärung erhalten
                                 </button>
                                 <button class="btn btn-secondary" id="clear-btn">
                                     <i class="fas fa-trash"></i>
@@ -620,17 +613,17 @@
                     </div>
                 </section>
 
-                <!-- Image Upload Tab -->
+                <!-- Image Upload Tab - Aufgabe korrigieren -->
                 <section class="tab-content" id="image-upload">
                     <div class="input-container">
                         <div class="input-header">
-                            <h3>Bild hochladen</h3>
-                            <p>Lade Fotos deiner handgeschriebenen Lösung oder Mathematik-Aufgabe hoch:</p>
+                            <h3>Aufgabe korrigieren</h3>
+                            <p>Lade ein Foto deiner Lösung hoch und lass sie auf Fehler überprüfen:</p>
                         </div>
                         <div class="image-upload-area">
                             <div class="upload-zone" id="upload-zone">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p class="upload-hint">Klicke hier oder ziehe Bilder hierher</p>
+                                <i class="fas fa-camera"></i>
+                                <p class="upload-hint">Klicke hier oder ziehe dein Lösungsbild hierher</p>
                                 <p class="upload-subhint">Unterstützt: JPG, PNG, GIF (mehrere Bilder möglich)</p>
                                 <input type="file" id="image-input" accept="image/*" hidden multiple>
                             </div>
@@ -653,17 +646,17 @@
                         </div>
                         <div class="image-description-area" id="image-description-area" style="display: none;">
                             <div class="form-group">
-                                <label for="image-description">Beschreibe dein Anliegen (optional):</label>
+                                <label for="image-description">Extrawünsche (optional):</label>
                                 <textarea 
                                     id="image-description" 
-                                    placeholder="z.B. 'Erkläre mir bitte Aufgabe 3' oder 'Ich verstehe nicht, wie man hier vorgeht' oder lass es leer für eine allgemeine Analyse..."
+                                    placeholder="z.B. 'Erkläre mir besonders den zweiten Schritt' oder 'Prüfe ob mein Ansatz richtig ist' oder lass es leer für eine vollständige Korrektur..."
                                     rows="3"
                                 ></textarea>
                             </div>
                             <div class="input-actions">
                                 <button class="btn btn-primary" id="analyze-image-btn">
-                                    <i class="fas fa-brain"></i>
-                                    Mit KI analysieren
+                                    <i class="fas fa-search"></i>
+                                    Lösung korrigieren
                                 </button>
                             </div>
                         </div>
@@ -796,65 +789,6 @@
                                 </button>
                             </div>
                             <div id="batch-progress"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Abitur Generate Tab -->
-                <section class="tab-content" id="abi-generate">
-                    <div class="input-container">
-                        <div class="input-header">
-                            <h3>Abitur-Modus</h3>
-                            <p>Erstelle Abitur-Aufgaben aus dem Aufgabenpool oder pflege neue Aufgaben über PDF-Dateien ein.</p>
-                        </div>
-                        <div class="abi-sections">
-                            <div class="abi-generator-section" id="abi-generator-section">
-                                <h4><i class="fas fa-random"></i> Aufgabe generieren</h4>
-                                <p>Starte die Generierung, um eine zufällige Abitur-Aufgabe zu variieren. Die Lernpräferenzen werden erst beim Hint berücksichtigt.</p>
-                                <button class="btn btn-primary" id="abi-generate-btn">
-                                    <i class="fas fa-magic"></i>
-                                    Abitur-Aufgabe erstellen
-                                </button>
-                                <div class="abi-generator-status" id="abi-generator-status"></div>
-                            </div>
-                            <div class="abi-admin-section">
-                                <h4><i class="fas fa-folder-plus"></i> Aufgabenpool verwalten</h4>
-                                <form id="abi-upload-form" class="abi-upload-form">
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="abi-pdf-input">PDF-Datei (eine Aufgabe):</label>
-                                            <input type="file" id="abi-pdf-input" accept="application/pdf" required>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="abi-title-input">Titel (optional):</label>
-                                            <input type="text" id="abi-title-input" placeholder="z.B. Analysis 2022 Teil 1">
-                                        </div>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="abi-year-input">Jahr:</label>
-                                            <input type="number" id="abi-year-input" min="2000" max="2100" placeholder="2024">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="abi-subject-input">Schwerpunkt (optional):</label>
-                                            <input type="text" id="abi-subject-input" placeholder="z.B. Analysis, Stochastik">
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="abi-tags-input">Tags (Komma getrennt, optional):</label>
-                                        <input type="text" id="abi-tags-input" placeholder="Parabel, Extremwert, Ableitung">
-                                    </div>
-                                    <button type="submit" class="btn btn-secondary" id="abi-upload-btn">
-                                        <i class="fas fa-upload"></i>
-                                        Aufgabe hochladen
-                                    </button>
-                                </form>
-                                <div id="abi-upload-status" class="form-status"></div>
-                                <div class="abi-task-list">
-                                    <h5>Vorhandene Abitur-Aufgaben</h5>
-                                    <ul id="abi-task-list" class="task-list"></ul>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </section>
