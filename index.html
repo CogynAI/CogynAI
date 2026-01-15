@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cogyn - Adaptive Lernplattform</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="splash-animation.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <!-- MathJax für mathematische Notationen -->
@@ -73,6 +75,238 @@
     <script src="topic-data.js"></script>
 </head>
 <body>
+    <!-- =====================================================
+         SPLASH ANIMATION OVERLAY
+         Futuristic Matrix-style loading animation
+         ===================================================== -->
+    <div id="splash-overlay" class="splash-overlay">
+        <!-- Top split panel (horizontal split) -->
+        <div class="splash-top">
+            <div class="matrix-bg"></div>
+            <div class="circuit-lines"></div>
+        </div>
+        
+        <!-- Bottom split panel (horizontal split) -->
+        <div class="splash-bottom">
+            <div class="matrix-bg"></div>
+            <div class="circuit-lines"></div>
+        </div>
+        
+        <!-- Horizontal light line (splits screen) -->
+        <div class="light-line"></div>
+        
+        <!-- Corner decorations -->
+        <div class="corner-decoration corner-tl"></div>
+        <div class="corner-decoration corner-tr"></div>
+        <div class="corner-decoration corner-bl"></div>
+        <div class="corner-decoration corner-br"></div>
+        
+        <!-- Crosshair lines -->
+        <div class="crosshair-lines">
+            <div class="crosshair-h"></div>
+            <div class="crosshair-v"></div>
+        </div>
+        
+        <!-- Glow effect -->
+        <div class="splash-glow"></div>
+        
+        <!-- Logo container with animated SVG -->
+        <div class="logo-container">
+            <svg class="splash-logo" viewBox="0 0 300 350" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <!-- Gradients -->
+                    <linearGradient id="splashGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#40E0D0;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#1E6B6B;stop-opacity:1" />
+                    </linearGradient>
+                    <linearGradient id="splashGradient2" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#0D3D3D;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#40E0D0;stop-opacity:1" />
+                    </linearGradient>
+                    <radialGradient id="coreGradient" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" style="stop-color:#40E0D0;stop-opacity:1" />
+                        <stop offset="70%" style="stop-color:#1E6B6B;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#0D3D3D;stop-opacity:1" />
+                    </radialGradient>
+                    
+                    <!-- Glow filter -->
+                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                
+                <!-- ===== TOP ARM / TOWER ===== -->
+                <g class="logo-arm logo-arm-top">
+                    <!-- Main tower stem -->
+                    <path d="M150 130 L150 60 L145 55 L150 40 L155 55 L150 60" 
+                          fill="none" stroke="url(#splashGradient1)" stroke-width="3"/>
+                    
+                    <!-- Tower hexagon top -->
+                    <polygon points="150,25 160,32 160,45 150,52 140,45 140,32" 
+                             fill="url(#coreGradient)" stroke="#40E0D0" stroke-width="2"/>
+                    
+                    <!-- Tower circuit lines -->
+                    <path d="M145 60 L135 65 L135 75 M155 60 L165 65 L165 75" 
+                          fill="none" stroke="#40E0D0" stroke-width="1.5" opacity="0.8"/>
+                    
+                    <!-- Tower base connectors -->
+                    <path d="M140 75 L140 90 L145 95 M160 75 L160 90 L155 95" 
+                          fill="none" stroke="#1E6B6B" stroke-width="2"/>
+                    
+                    <!-- Small circuit nodes -->
+                    <circle cx="135" cy="75" r="3" fill="#40E0D0"/>
+                    <circle cx="165" cy="75" r="3" fill="#40E0D0"/>
+                    
+                    <!-- Decorative lines -->
+                    <line x1="150" y1="52" x2="150" y2="95" stroke="#40E0D0" stroke-width="2" opacity="0.6"/>
+                </g>
+                
+                <!-- ===== BOTTOM LEFT ARM ===== -->
+                <g class="logo-arm logo-arm-left">
+                    <!-- Main arm structure -->
+                    <path d="M115 220 L70 250 L55 248 L40 260 L50 245 L55 248" 
+                          fill="none" stroke="url(#splashGradient1)" stroke-width="3"/>
+                    
+                    <!-- Circuit board pattern -->
+                    <path d="M80 245 L75 255 L60 258 M85 250 L90 260 L80 265" 
+                          fill="none" stroke="#40E0D0" stroke-width="1.5" opacity="0.8"/>
+                    
+                    <!-- Hexagon end piece -->
+                    <polygon points="40,255 50,250 58,255 58,265 50,270 40,265" 
+                             fill="url(#coreGradient)" stroke="#40E0D0" stroke-width="1.5"/>
+                    
+                    <!-- Circuit nodes -->
+                    <circle cx="75" cy="255" r="2.5" fill="#40E0D0"/>
+                    <circle cx="90" cy="260" r="2.5" fill="#40E0D0"/>
+                    
+                    <!-- Additional circuit traces -->
+                    <path d="M100 230 L95 235 L85 235 L80 240" 
+                          fill="none" stroke="#1E6B6B" stroke-width="2"/>
+                    
+                    <!-- Small decorative elements -->
+                    <rect x="62" y="252" width="8" height="3" fill="#40E0D0" opacity="0.6"/>
+                </g>
+                
+                <!-- ===== BOTTOM RIGHT ARM ===== -->
+                <g class="logo-arm logo-arm-right">
+                    <!-- Main arm structure (mirrored) -->
+                    <path d="M185 220 L230 250 L245 248 L260 260 L250 245 L245 248" 
+                          fill="none" stroke="url(#splashGradient1)" stroke-width="3"/>
+                    
+                    <!-- Circuit board pattern -->
+                    <path d="M220 245 L225 255 L240 258 M215 250 L210 260 L220 265" 
+                          fill="none" stroke="#40E0D0" stroke-width="1.5" opacity="0.8"/>
+                    
+                    <!-- Hexagon end piece -->
+                    <polygon points="260,255 250,250 242,255 242,265 250,270 260,265" 
+                             fill="url(#coreGradient)" stroke="#40E0D0" stroke-width="1.5"/>
+                    
+                    <!-- Circuit nodes -->
+                    <circle cx="225" cy="255" r="2.5" fill="#40E0D0"/>
+                    <circle cx="210" cy="260" r="2.5" fill="#40E0D0"/>
+                    
+                    <!-- Additional circuit traces -->
+                    <path d="M200 230 L205 235 L215 235 L220 240" 
+                          fill="none" stroke="#1E6B6B" stroke-width="2"/>
+                    
+                    <!-- Small decorative elements -->
+                    <rect x="230" y="252" width="8" height="3" fill="#40E0D0" opacity="0.6"/>
+                </g>
+                
+                <!-- ===== OUTER RING ===== -->
+                <g class="logo-ring-outer" filter="url(#glow)">
+                    <circle cx="150" cy="175" r="70" fill="none" 
+                            stroke="url(#splashGradient1)" stroke-width="4" opacity="0.9"/>
+                    <!-- Ring segments/markers -->
+                    <circle cx="150" cy="105" r="4" fill="#40E0D0"/>
+                    <circle cx="210.6" cy="140" r="3" fill="#40E0D0"/>
+                    <circle cx="210.6" cy="210" r="3" fill="#40E0D0"/>
+                    <circle cx="150" cy="245" r="4" fill="#40E0D0"/>
+                    <circle cx="89.4" cy="210" r="3" fill="#40E0D0"/>
+                    <circle cx="89.4" cy="140" r="3" fill="#40E0D0"/>
+                </g>
+                
+                <!-- ===== MIDDLE RING ===== -->
+                <g class="logo-ring-middle">
+                    <circle cx="150" cy="175" r="55" fill="none" 
+                            stroke="#1E6B6B" stroke-width="6" opacity="0.8"/>
+                    <!-- Dashed inner line -->
+                    <circle cx="150" cy="175" r="52" fill="none" 
+                            stroke="#40E0D0" stroke-width="1" stroke-dasharray="8 4" opacity="0.5"/>
+                </g>
+                
+                <!-- ===== INNER RING ===== -->
+                <g class="logo-ring-inner">
+                    <circle cx="150" cy="175" r="40" fill="none" 
+                            stroke="url(#splashGradient2)" stroke-width="3"/>
+                    <!-- Tick marks -->
+                    <line x1="150" y1="135" x2="150" y2="140" stroke="#40E0D0" stroke-width="2"/>
+                    <line x1="150" y1="210" x2="150" y2="215" stroke="#40E0D0" stroke-width="2"/>
+                    <line x1="110" y1="175" x2="115" y2="175" stroke="#40E0D0" stroke-width="2"/>
+                    <line x1="185" y1="175" x2="190" y2="175" stroke="#40E0D0" stroke-width="2"/>
+                </g>
+                
+                <!-- ===== CORE STRUCTURE ===== -->
+                <g class="logo-core">
+                    <!-- Outer core circle -->
+                    <circle cx="150" cy="175" r="30" fill="#0D3D3D" 
+                            stroke="#40E0D0" stroke-width="2"/>
+                    
+                    <!-- Core ring decoration -->
+                    <circle cx="150" cy="175" r="25" fill="none" 
+                            stroke="#1E6B6B" stroke-width="3"/>
+                    
+                    <!-- Middle hexagon -->
+                    <polygon points="150,155 167,165 167,185 150,195 133,185 133,165" 
+                             fill="none" stroke="#40E0D0" stroke-width="2"/>
+                    
+                    <!-- Inner hexagon -->
+                    <polygon points="150,162 160,168 160,182 150,188 140,182 140,168" 
+                             fill="url(#coreGradient)" stroke="#40E0D0" stroke-width="1.5"/>
+                    
+                    <!-- Center hexagon (smallest) -->
+                    <polygon points="150,169 155,172 155,178 150,181 145,178 145,172" 
+                             fill="#40E0D0" stroke="#0D3D3D" stroke-width="1"/>
+                    
+                    <!-- Core inner details -->
+                    <circle cx="150" cy="175" r="5" fill="#0D3D3D" stroke="#40E0D0" stroke-width="1"/>
+                </g>
+                
+                <!-- ===== CROSSHAIR LINES ===== -->
+                <g opacity="0.4">
+                    <line x1="80" y1="175" x2="220" y2="175" stroke="#40E0D0" stroke-width="0.5"/>
+                    <line x1="150" y1="100" x2="150" y2="250" stroke="#40E0D0" stroke-width="0.5"/>
+                    <!-- Diagonal lines -->
+                    <line x1="100" y1="125" x2="200" y2="225" stroke="#40E0D0" stroke-width="0.5" opacity="0.3"/>
+                    <line x1="200" y1="125" x2="100" y2="225" stroke="#40E0D0" stroke-width="0.5" opacity="0.3"/>
+                </g>
+                
+                <!-- ===== DECORATIVE BRACKETS ===== -->
+                <g opacity="0.6">
+                    <!-- Left bracket -->
+                    <path d="M70 150 L65 155 L65 195 L70 200" 
+                          fill="none" stroke="#40E0D0" stroke-width="1.5"/>
+                    <!-- Right bracket -->
+                    <path d="M230 150 L235 155 L235 195 L230 200" 
+                          fill="none" stroke="#40E0D0" stroke-width="1.5"/>
+                </g>
+            </svg>
+        </div>
+        
+        <!-- Loading text -->
+        <div class="splash-text">Initializing</div>
+        
+        <!-- Skip button -->
+        <button class="splash-skip">Skip</button>
+    </div>
+    
+    <!-- White overlay for smooth transition -->
+    <div class="white-overlay"></div>
+
     <!-- Auth Check Script (muss vor dem Rest laden) -->
     <script>
         // =====================================================
@@ -190,7 +424,7 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="logo">C</div>
+                <img src="logo.png" alt="Cogyn Logo" class="logo-img">
                 <h1>Cogyn</h1>
             </div>
             <nav class="sidebar-nav">
@@ -273,7 +507,10 @@
             <button class="menu-toggle" id="menu-toggle">
                 <i class="fas fa-bars"></i>
             </button>
-            <div class="logo">Cogyn</div>
+            <div class="logo-mobile">
+                <img src="logo.png" alt="Cogyn Logo" class="logo-img-mobile">
+                <span>Cogyn</span>
+            </div>
             <button class="profile-toggle" id="profile-toggle">
                 <i class="fas fa-user"></i>
             </button>
@@ -319,7 +556,7 @@
                 <div class="welcome-content hero-grid">
                     <div class="hero-card">
                         <div class="hero-content">
-                            <div class="hero-logo">C</div>
+                            <img src="logo.png" alt="Cogyn Logo" class="hero-logo-img">
                             <div>
                                 <div class="eyebrow">Dein persönlicher Tutor</div>
                                 <h2>Mathematik verstehen mit KI</h2>
@@ -914,5 +1151,8 @@
     <script src="tutor-view.js"></script>
     
     <script src="script.js"></script>
+    
+    <!-- Splash Animation (loaded last to ensure DOM is ready) -->
+    <script src="splash-animation.js"></script>
 </body>
 </html>
