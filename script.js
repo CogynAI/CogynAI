@@ -214,6 +214,51 @@ ERROR_ANALYSIS_SCHEMA.schema.properties.detailedFeedback = {
     additionalProperties: false
 };
 
+// Kompetenz-Analyse für Stärken/Schwächen-Tracking
+ERROR_ANALYSIS_SCHEMA.schema.properties.competencyAnalysis = {
+    type: "object",
+    description: "Analyse der mathematischen Kompetenzen basierend auf dem Lösungsweg. NUR vordefinierte competencyIds aus dem Schema verwenden!",
+    properties: {
+        identifiedCompetencies: {
+            type: "array",
+            description: "Liste der identifizierten Kompetenzen mit Bewertung",
+            items: {
+                type: "object",
+                properties: {
+                    competencyId: {
+                        type: "string",
+                        description: "ID aus dem festen Kompetenz-Schema (z.B. 'algebra_fractions', 'analysis_derivative_chain')"
+                    },
+                    demonstrated: {
+                        type: "boolean",
+                        description: "true wenn die Kompetenz im Lösungsweg angewendet wurde"
+                    },
+                    rating: {
+                        type: "number",
+                        description: "Bewertung 1-10 (1=sehr schlecht, 5=mittelmäßig, 10=exzellent)"
+                    },
+                    evidence: {
+                        type: "string",
+                        description: "Kurze Begründung für das Rating (max 1 Satz)"
+                    }
+                },
+                required: ["competencyId", "demonstrated", "rating", "evidence"],
+                additionalProperties: false
+            }
+        },
+        primaryCompetency: {
+            type: "string",
+            description: "Die Haupt-Kompetenz die bei dieser Aufgabe geprüft wurde (competencyId)"
+        },
+        overallAssessment: {
+            type: "string",
+            description: "Kurze Zusammenfassung der Kompetenz-Bewertung (1-2 Sätze)"
+        }
+    },
+    required: ["identifiedCompetencies", "overallAssessment"],
+    additionalProperties: false
+};
+
 // Mapping von errorType zu Farben für uiElements
 const ERROR_TYPE_COLOR_MAP = {
     'logic': 'red',
@@ -1721,14 +1766,20 @@ class MathTutorAI {
             this.performanceTracker = new PerformanceTracker(this.dbService);
             this.behaviorTracker = new BehaviorTracker(this.dbService);
             
+            // Initialisiere Strength/Weakness Tracker
+            if (window.StrengthWeaknessTracker) {
+                this.strengthWeaknessTracker = new StrengthWeaknessTracker(this.dbService);
+                console.log('[MathTutor] StrengthWeaknessTracker initialized');
+            }
+
             // Initialisiere AI Services
             this.dataAggregator = new DataAggregator(
                 this.competencyTracker,
                 this.performanceTracker,
                 this.behaviorTracker
             );
-            this.promptAdvisor = new PromptAdvisor(this.dataAggregator);
-            
+            this.promptAdvisor = new PromptAdvisor(this.dataAggregator, this.strengthWeaknessTracker);
+
             console.log('[MathTutorAI] Tracking system initialized');
         } catch (error) {
             console.error('[MathTutorAI] Tracking initialization error:', error);
@@ -1886,6 +1937,14 @@ class MathTutorAI {
             this.toggleApiKeyVisibility();
         });
 
+        // Strength/Weakness Dashboard Refresh
+        const swRefreshBtn = document.getElementById('sw-refresh');
+        if (swRefreshBtn) {
+            swRefreshBtn.addEventListener('click', () => {
+                this.loadStrengthWeaknessDashboard(true);
+            });
+        }
+
         // Enter key for text input
         document.getElementById('math-input').addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
@@ -1944,6 +2003,11 @@ class MathTutorAI {
             // Lade Profil neu, wenn Profil-Tab geöffnet wird
             if (targetTab === 'user-profile' && this.userProfile) {
                 this.populateProfileForm(this.userProfile);
+            }
+            
+            // Lade Stärken/Schwächen Dashboard, wenn Profil-Tab geöffnet wird
+            if (targetTab === 'user-profile') {
+                this.loadStrengthWeaknessDashboard();
             }
         };
 
@@ -2735,6 +2799,9 @@ Schwierigkeit: ${difficulty}
 `;
         }
 
+        // Kompetenz-Schema für strukturierte Analyse
+        const competencySchemaSection = this._buildCompetencySchemaSection();
+
         // ULTRA-KOMPAKTER PROMPT - Hints + Feedback werden programmatisch generiert
         const systemPrompt = `Mathe-Fehleranalyse. Gib JSON zurück.
 
@@ -2744,10 +2811,11 @@ AUFGABEN:
 1. Schritte zerlegen (je Schritt eine Umformung)
 2. operation pro Schritt (außer letztem): z.B. ":2", "+3", "zgf."
 3. errorType: logic (P1) > calc (P2) > followup (P3) > formal > none
+4. competencyAnalysis: Bewerte gezeigte Kompetenzen (1-10)
 
-OUTPUT: {"steps":[{"index":1,"rawText":"...","latex":"...","errorType":"...","operation":"..."}],"isCorrect":true/false,"feedback":{"summarySentence":"1-2 Sätze"}}
+OUTPUT: {"steps":[...],"isCorrect":true/false,"feedback":{...},"competencyAnalysis":{...}}
 Nur reiner LaTeX (keine Delimiter).
-${studentContextSection}${previousFeedbackSection}`;
+${competencySchemaSection}${studentContextSection}${previousFeedbackSection}`;
 
         const userPrompt = `Aufgabe:
 ${this.currentTask}
@@ -2757,9 +2825,122 @@ ${userSolution || '(Keine schriftliche Lösung, nur Zeichnung)'}
 ${drawingInfo}
 
 Analysiere den Lösungsweg und gib das Ergebnis als JSON im vorgegebenen Schema zurück.
-Achte darauf, bei jedem Schritt (außer dem letzten) das "operation"-Feld anzugeben.`;
+Achte darauf, bei jedem Schritt (außer dem letzten) das "operation"-Feld anzugeben.
+Füge auch "competencyAnalysis" hinzu mit den identifizierten Kompetenzen und Ratings (1-10).`;
 
         return { systemPrompt, userPrompt };
+    }
+
+    /**
+     * Baut die Kompetenz-Schema Sektion für den Prompt
+     * @returns {string} - Kompetenz-Referenz für den Prompt
+     */
+    _buildCompetencySchemaSection() {
+        // Prüfe ob CompetencySchema verfügbar ist
+        if (!window.CompetencySchema) {
+            return '';
+        }
+
+        // Kompakte Liste der relevanten Kompetenzen
+        const categories = window.CompetencySchema.COMPETENCY_CATEGORIES;
+        const competencies = window.CompetencySchema.MATH_COMPETENCIES;
+        
+        // Nur die wichtigsten Kategorien für den Prompt
+        let section = `
+=== KOMPETENZ-BEWERTUNG ===
+Bewerte NUR Kompetenzen, die im Lösungsweg sichtbar sind.
+Verwende NUR diese competencyIds:
+`;
+        
+        // Gruppiere nach Kategorie (kompakt)
+        for (const [catId, catInfo] of Object.entries(categories)) {
+            const catCompetencies = Object.values(competencies)
+                .filter(c => c.category === catId)
+                .map(c => c.id)
+                .slice(0, 5); // Max 5 pro Kategorie für Kompaktheit
+            
+            if (catCompetencies.length > 0) {
+                section += `${catInfo.name}: ${catCompetencies.join(', ')}\n`;
+            }
+        }
+        
+        section += `
+competencyAnalysis Format:
+{"identifiedCompetencies":[{"competencyId":"...","demonstrated":true,"rating":7,"evidence":"Kurze Begründung"}],"overallAssessment":"1-2 Sätze"}
+Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerten.
+`;
+        
+        return section;
+    }
+
+    /**
+     * Verarbeitet Stärken/Schwächen-Tracking nach einer Analyse
+     * @param {Object} analysisResponse - Die Analyse-Antwort von der KI
+     * @param {boolean} success - Ob die Lösung erfolgreich war
+     */
+    async _processStrengthWeaknessTracking(analysisResponse, success) {
+        if (!this.strengthWeaknessTracker || !this.userId) {
+            return;
+        }
+
+        try {
+            const topic = this.currentTaskContext?.topic || '';
+            const subTopic = this.currentTaskContext?.subTopic || '';
+
+            // 1. Fehlerbilanzen aktualisieren
+            if (analysisResponse.steps && Array.isArray(analysisResponse.steps)) {
+                for (const step of analysisResponse.steps) {
+                    if (step.errorType && step.errorType !== 'none') {
+                        await this.strengthWeaknessTracker.recordError(
+                            this.userId,
+                            topic,
+                            subTopic,
+                            step.errorType,
+                            { stepIndex: step.index }
+                        );
+                    }
+                }
+            }
+
+            // 2. Kompetenz-Ratings aus KI-Analyse speichern
+            if (analysisResponse.competencyAnalysis && analysisResponse.competencyAnalysis.identifiedCompetencies) {
+                const ratings = analysisResponse.competencyAnalysis.identifiedCompetencies
+                    .filter(c => c.competencyId && c.rating !== undefined)
+                    .map(c => ({
+                        competencyId: c.competencyId,
+                        rating: c.rating,
+                        evidence: c.evidence || ''
+                    }));
+
+                if (ratings.length > 0) {
+                    await this.strengthWeaknessTracker.recordMultipleRatings(
+                        this.userId,
+                        ratings,
+                        { topic, subTopic, success }
+                    );
+                    console.log('[StrengthWeakness] Saved competency ratings:', ratings.length);
+                }
+            } else if (success) {
+                // Fallback: Bei Erfolg ohne KI-Analyse regelbasiertes Update
+                await this.strengthWeaknessTracker.adjustCompetenciesFromSuccess(
+                    this.userId,
+                    topic,
+                    subTopic
+                );
+            }
+
+            // 3. Nutzungsaktivität aufzeichnen
+            await this.dbService.recordActivity(this.userId, {
+                taskAttempted: true,
+                taskCompleted: success,
+                topic: topic
+            });
+
+            console.log('[StrengthWeakness] Tracking completed for', topic);
+        } catch (error) {
+            // Fehler nicht nach oben propagieren - Tracking soll nicht den Hauptflow unterbrechen
+            console.error('[StrengthWeakness] Tracking error:', error);
+        }
     }
 
     /**
@@ -5046,6 +5227,9 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
                         success
                     });
                 }
+                
+                // Process Strength/Weakness Tracking
+                await this._processStrengthWeaknessTracking(analysisResponse, success);
             }
             
             // Zeige strukturierte Feedback-Anzeige
@@ -6290,15 +6474,15 @@ Verwende eine klare Struktur und deutsche mathematische Terminologie.
             return converted;
         }
         
-        // Konvertiere $...$ zu \(...\) für inline math
-        converted = converted.replace(/\$([^\$]+)\$/g, '\\($1\\)');
+        // WICHTIG: Reihenfolge ist kritisch!
+        // ZUERST $$...$$ (display math) konvertieren, DANN $...$ (inline math)
+        // Andernfalls werden die inneren $ von $$ zuerst konvertiert und das Ergebnis ist kaputt
         
-        // Konvertiere $$...$$ zu \[...\] für display math
+        // Konvertiere $$...$$ zu \[...\] für display math (ZUERST!)
         converted = converted.replace(/\$\$([^\$]+)\$\$/g, '\\[$1\\]');
         
-        // Schütze bereits korrekte LaTeX-Ausdrücke vor doppelter Konvertierung
-        // Wrappen komplexer mathematischer Ausdrücke nur wenn sie noch nicht gewrappt sind
-        // und NICHT einzelne Befehle wrappen
+        // Konvertiere $...$ zu \(...\) für inline math (DANACH!)
+        converted = converted.replace(/\$([^\$]+)\$/g, '\\($1\\)');
         
         return converted;
     }
@@ -6583,6 +6767,180 @@ Verwende eine klare Struktur und deutsche mathematische Terminologie.
             this.userProfile = defaultProfile;
             localStorage.removeItem('user_profile');
             this.showNotification('Profil wurde zurückgesetzt.', 'info');
+        }
+    }
+
+    /**
+     * Lädt und zeigt das Stärken/Schwächen Dashboard an
+     * @param {boolean} forceRefresh - Cache umgehen und neu laden
+     */
+    async loadStrengthWeaknessDashboard(forceRefresh = false) {
+        const loadingEl = document.getElementById('sw-loading');
+        const noDataEl = document.getElementById('sw-no-data');
+        const contentEl = document.getElementById('sw-content');
+        
+        if (!loadingEl || !contentEl) return;
+        
+        // Zeige Loading
+        loadingEl.style.display = 'flex';
+        noDataEl.style.display = 'none';
+        contentEl.style.display = 'none';
+        
+        try {
+            if (!this.strengthWeaknessTracker || !this.userId) {
+                // Kein Tracker oder User
+                loadingEl.style.display = 'none';
+                noDataEl.style.display = 'flex';
+                return;
+            }
+            
+            // Invalidiere Cache bei force refresh
+            if (forceRefresh) {
+                this.strengthWeaknessTracker._invalidateCache(this.userId);
+            }
+            
+            // Lade Profil-Daten
+            const profile = await this.strengthWeaknessTracker.getFullProfile(this.userId);
+            
+            // Prüfe ob genug Daten vorhanden sind
+            const hasData = profile.competencies.all.length > 0 || 
+                           profile.errors.stats.total > 0 || 
+                           profile.usage.totalTasks > 0;
+            
+            if (!hasData) {
+                loadingEl.style.display = 'none';
+                noDataEl.style.display = 'flex';
+                return;
+            }
+            
+            // Fülle Dashboard
+            this._populateStrengthWeaknessDashboard(profile);
+            
+            loadingEl.style.display = 'none';
+            contentEl.style.display = 'block';
+            
+        } catch (error) {
+            console.error('[Dashboard] Error loading:', error);
+            loadingEl.style.display = 'none';
+            noDataEl.style.display = 'flex';
+            noDataEl.querySelector('span').textContent = 'Fehler beim Laden des Dashboards.';
+        }
+    }
+
+    /**
+     * Füllt das Dashboard mit Profildaten
+     * @param {Object} profile - Das Profil vom StrengthWeaknessTracker
+     */
+    _populateStrengthWeaknessDashboard(profile) {
+        // Summary Stats
+        const tasksEl = document.getElementById('sw-tasks-completed');
+        const streakEl = document.getElementById('sw-streak');
+        const avgEl = document.getElementById('sw-avg-rating');
+        
+        if (tasksEl) tasksEl.textContent = profile.usage.totalTasks || 0;
+        if (streakEl) streakEl.textContent = profile.usage.currentStreak || 0;
+        if (avgEl) {
+            const avg = profile.competencies.summary?.averageRating;
+            avgEl.textContent = avg ? `${avg.toFixed(1)}/10` : '-';
+        }
+        
+        // Stärken
+        const strengthsEl = document.getElementById('sw-strengths');
+        if (strengthsEl) {
+            if (profile.competencies.strong.length > 0) {
+                strengthsEl.innerHTML = profile.competencies.strong.slice(0, 5).map(c => `
+                    <div class="sw-competency-item sw-strength">
+                        <span class="sw-competency-name">${c.name}</span>
+                        <div class="sw-rating-bar">
+                            <div class="sw-rating-fill" style="width: ${(c.weightedAverage / 10) * 100}%"></div>
+                        </div>
+                        <span class="sw-rating-value">${c.weightedAverage.toFixed(1)}</span>
+                        ${c.trend === 'improving' ? '<i class="fas fa-arrow-up sw-trend-up"></i>' : ''}
+                        ${c.trend === 'declining' ? '<i class="fas fa-arrow-down sw-trend-down"></i>' : ''}
+                    </div>
+                `).join('');
+            } else {
+                strengthsEl.innerHTML = '<div class="sw-empty">Noch keine Stärken identifiziert</div>';
+            }
+        }
+        
+        // Schwächen
+        const weaknessesEl = document.getElementById('sw-weaknesses');
+        if (weaknessesEl) {
+            if (profile.competencies.weak.length > 0) {
+                weaknessesEl.innerHTML = profile.competencies.weak.slice(0, 5).map(c => `
+                    <div class="sw-competency-item sw-weakness">
+                        <span class="sw-competency-name">${c.name}</span>
+                        <div class="sw-rating-bar">
+                            <div class="sw-rating-fill" style="width: ${(c.weightedAverage / 10) * 100}%"></div>
+                        </div>
+                        <span class="sw-rating-value">${c.weightedAverage.toFixed(1)}</span>
+                        ${c.trend === 'improving' ? '<i class="fas fa-arrow-up sw-trend-up"></i>' : ''}
+                        ${c.trend === 'declining' ? '<i class="fas fa-arrow-down sw-trend-down"></i>' : ''}
+                    </div>
+                `).join('');
+            } else {
+                weaknessesEl.innerHTML = '<div class="sw-empty">Noch keine Schwächen identifiziert</div>';
+            }
+        }
+        
+        // Fehlerbilanzen
+        const errorStats = profile.errors.stats.byErrorType || {};
+        document.getElementById('sw-error-logic')?.textContent && 
+            (document.getElementById('sw-error-logic').textContent = errorStats.logic || 0);
+        document.getElementById('sw-error-calc')?.textContent && 
+            (document.getElementById('sw-error-calc').textContent = errorStats.calc || 0);
+        document.getElementById('sw-error-followup')?.textContent && 
+            (document.getElementById('sw-error-followup').textContent = errorStats.followup || 0);
+        document.getElementById('sw-error-formal')?.textContent && 
+            (document.getElementById('sw-error-formal').textContent = errorStats.formal || 0);
+        
+        // Empfehlungen
+        const suggestionsEl = document.getElementById('sw-suggestions');
+        if (suggestionsEl) {
+            this._loadSuggestions(suggestionsEl);
+        }
+    }
+
+    /**
+     * Lädt Verbesserungsvorschläge
+     */
+    async _loadSuggestions(container) {
+        try {
+            if (!this.strengthWeaknessTracker || !this.userId) {
+                container.innerHTML = '<div class="sw-empty">Keine Empfehlungen verfügbar</div>';
+                return;
+            }
+            
+            const suggestions = await this.strengthWeaknessTracker.getImprovementSuggestions(this.userId, 3);
+            
+            if (suggestions.length === 0) {
+                container.innerHTML = '<div class="sw-empty">Löse mehr Aufgaben für personalisierte Empfehlungen</div>';
+                return;
+            }
+            
+            const priorityColors = {
+                high: 'var(--error-color)',
+                medium: 'var(--warning-color)',
+                low: 'var(--success-color)'
+            };
+            
+            const priorityIcons = {
+                high: 'fa-exclamation-circle',
+                medium: 'fa-info-circle',
+                low: 'fa-check-circle'
+            };
+            
+            container.innerHTML = suggestions.map(s => `
+                <div class="sw-suggestion-item" style="border-left: 3px solid ${priorityColors[s.priority] || priorityColors.medium}">
+                    <i class="fas ${priorityIcons[s.priority] || priorityIcons.medium}" style="color: ${priorityColors[s.priority] || priorityColors.medium}"></i>
+                    <span>${s.message}</span>
+                </div>
+            `).join('');
+            
+        } catch (error) {
+            console.error('[Dashboard] Error loading suggestions:', error);
+            container.innerHTML = '<div class="sw-empty">Fehler beim Laden der Empfehlungen</div>';
         }
     }
 

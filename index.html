@@ -47,6 +47,10 @@
     <script src="tracking/competency-tracker.js"></script>
     <script src="tracking/performance-tracker.js"></script>
     <script src="tracking/behavior-tracker.js"></script>
+    <script src="tracking/strength-weakness-tracker.js"></script>
+    
+    <!-- Competency Schema -->
+    <script src="data/competency-schema.js"></script>
     
     <!-- AI Services -->
     <script src="ai/data-aggregator.js"></script>
@@ -704,6 +708,115 @@
                                         <option value="anthropic">Anthropic (Claude)</option>
                                         <option value="local">Lokales Modell</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <!-- Stärken/Schwächen Dashboard -->
+                            <div class="profile-section strength-weakness-dashboard" id="strength-weakness-section">
+                                <h4><i class="fas fa-chart-line"></i> Dein Lernfortschritt</h4>
+                                <p style="color: var(--text-secondary); font-size: var(--font-size-sm); margin-bottom: var(--spacing-4);">
+                                    Basierend auf deinen bisherigen Übungen und Lösungsversuchen:
+                                </p>
+                                
+                                <!-- Loading State -->
+                                <div class="sw-loading" id="sw-loading">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Lade Lernfortschritt...</span>
+                                </div>
+                                
+                                <!-- No Data State -->
+                                <div class="sw-no-data" id="sw-no-data" style="display: none;">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>Noch nicht genug Daten. Löse einige Aufgaben, um deinen Lernfortschritt zu sehen!</span>
+                                </div>
+                                
+                                <!-- Dashboard Content -->
+                                <div class="sw-content" id="sw-content" style="display: none;">
+                                    <!-- Summary Stats -->
+                                    <div class="sw-summary">
+                                        <div class="sw-stat-card">
+                                            <div class="sw-stat-icon" style="background: var(--success-color);">
+                                                <i class="fas fa-check-circle"></i>
+                                            </div>
+                                            <div class="sw-stat-info">
+                                                <span class="sw-stat-value" id="sw-tasks-completed">0</span>
+                                                <span class="sw-stat-label">Aufgaben gelöst</span>
+                                            </div>
+                                        </div>
+                                        <div class="sw-stat-card">
+                                            <div class="sw-stat-icon" style="background: var(--primary-color);">
+                                                <i class="fas fa-fire"></i>
+                                            </div>
+                                            <div class="sw-stat-info">
+                                                <span class="sw-stat-value" id="sw-streak">0</span>
+                                                <span class="sw-stat-label">Tage Streak</span>
+                                            </div>
+                                        </div>
+                                        <div class="sw-stat-card">
+                                            <div class="sw-stat-icon" style="background: var(--warning-color);">
+                                                <i class="fas fa-star"></i>
+                                            </div>
+                                            <div class="sw-stat-info">
+                                                <span class="sw-stat-value" id="sw-avg-rating">-</span>
+                                                <span class="sw-stat-label">Durchschnitt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Strengths Section -->
+                                    <div class="sw-section">
+                                        <h5><i class="fas fa-thumbs-up"></i> Deine Stärken</h5>
+                                        <div class="sw-competency-list" id="sw-strengths">
+                                            <div class="sw-empty">Noch keine Stärken identifiziert</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Weaknesses Section -->
+                                    <div class="sw-section">
+                                        <h5><i class="fas fa-thumbs-down"></i> Verbesserungspotential</h5>
+                                        <div class="sw-competency-list" id="sw-weaknesses">
+                                            <div class="sw-empty">Noch keine Schwächen identifiziert</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Error Balance Section -->
+                                    <div class="sw-section">
+                                        <h5><i class="fas fa-exclamation-triangle"></i> Fehlerbilanzen</h5>
+                                        <div class="sw-error-grid" id="sw-errors">
+                                            <div class="sw-error-item">
+                                                <span class="sw-error-type" style="background: var(--error-logic-color);">Logik</span>
+                                                <span class="sw-error-count" id="sw-error-logic">0</span>
+                                            </div>
+                                            <div class="sw-error-item">
+                                                <span class="sw-error-type" style="background: var(--error-calc-color);">Rechnung</span>
+                                                <span class="sw-error-count" id="sw-error-calc">0</span>
+                                            </div>
+                                            <div class="sw-error-item">
+                                                <span class="sw-error-type" style="background: var(--error-followup-color);">Folge</span>
+                                                <span class="sw-error-count" id="sw-error-followup">0</span>
+                                            </div>
+                                            <div class="sw-error-item">
+                                                <span class="sw-error-type" style="background: var(--error-formal-color);">Formal</span>
+                                                <span class="sw-error-count" id="sw-error-formal">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Suggestions Section -->
+                                    <div class="sw-section">
+                                        <h5><i class="fas fa-lightbulb"></i> Empfehlungen</h5>
+                                        <div class="sw-suggestions" id="sw-suggestions">
+                                            <div class="sw-empty">Löse mehr Aufgaben für personalisierte Empfehlungen</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Refresh Button -->
+                                <div class="sw-actions">
+                                    <button class="btn btn-secondary" id="sw-refresh">
+                                        <i class="fas fa-sync-alt"></i>
+                                        Aktualisieren
+                                    </button>
                                 </div>
                             </div>
 

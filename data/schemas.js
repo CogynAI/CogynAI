@@ -228,6 +228,126 @@ const LearningGoalsSchema = {
     }
 };
 
+// ==================== Error Balance Schema ====================
+// Trackt Fehlerbilanzen pro Thema/Unterthema und Fehlertyp
+const ErrorBalanceSchema = {
+    tableName: 'MathTutor-ErrorBalance',
+    primaryKey: 'userId',
+    sortKey: 'balanceKey',        // Format: topic#subTopic#errorType
+    
+    // Attribute-Definitionen
+    attributes: {
+        userId: 'string',           // PK: User ID
+        balanceKey: 'string',       // SK: topic#subTopic#errorType
+        topic: 'string',            // Hauptthema
+        subTopic: 'string',         // Unterthema (kann leer sein)
+        errorType: 'string',        // Fehlertyp: logic, calc, followup, formal
+        count: 'number',            // Anzahl Fehler
+        recentCount: 'number',      // Anzahl in letzten 7 Tagen
+        lastOccurrence: 'timestamp',// Letztes Auftreten
+        firstOccurrence: 'timestamp',// Erstes Auftreten
+        recentTrend: 'string',      // improving, stable, worsening
+        history: 'array',           // Historische Zählungen [{date, count}, ...]
+        lastUpdated: 'timestamp'
+    },
+    
+    // Verfügbare Fehlertypen
+    errorTypes: {
+        LOGIC: 'logic',             // Logikfehler (falscher Ansatz)
+        CALC: 'calc',               // Rechenfehler (richtiger Ansatz, falsche Rechnung)
+        FOLLOWUP: 'followup',       // Folgefehler (aus vorherigem Fehler)
+        FORMAL: 'formal'            // Formaler Fehler (Notation, Darstellung)
+    },
+    
+    defaults: {
+        count: 0,
+        recentCount: 0,
+        recentTrend: 'stable',
+        history: []
+    }
+};
+
+// ==================== Competency Ratings Schema ====================
+// Speichert KI-generierte Kompetenz-Bewertungen
+const CompetencyRatingsSchema = {
+    tableName: 'MathTutor-CompetencyRatings',
+    primaryKey: 'userId',
+    sortKey: 'competencyId',      // ID aus MATH_COMPETENCIES
+    
+    // Attribute-Definitionen
+    attributes: {
+        userId: 'string',           // PK: User ID
+        competencyId: 'string',     // SK: Kompetenz-ID aus fixem Schema
+        ratings: 'array',           // Letzte N Ratings [{value, timestamp, context}, ...]
+        averageRating: 'number',    // Durchschnitt (1-10)
+        weightedAverage: 'number',  // Gewichteter Durchschnitt (neuere zählen mehr)
+        sampleCount: 'number',      // Anzahl Bewertungen
+        confidence: 'string',       // low (<3), medium (3-9), high (>=10)
+        trend: 'string',            // improving, stable, declining
+        lastPositive: 'timestamp',  // Letztes positives Rating (>=7)
+        lastNegative: 'timestamp',  // Letztes negatives Rating (<=4)
+        lastUpdated: 'timestamp'
+    },
+    
+    // Confidence-Level basierend auf Sample-Anzahl
+    confidenceLevels: {
+        LOW: { min: 0, max: 2, label: 'low' },
+        MEDIUM: { min: 3, max: 9, label: 'medium' },
+        HIGH: { min: 10, max: Infinity, label: 'high' }
+    },
+    
+    defaults: {
+        ratings: [],
+        averageRating: 5,           // Neutral start
+        weightedAverage: 5,
+        sampleCount: 0,
+        confidence: 'low',
+        trend: 'stable'
+    }
+};
+
+// ==================== Usage Stats Schema ====================
+// Trackt Nutzungsstatistiken und Engagement
+const UsageStatsSchema = {
+    tableName: 'MathTutor-UsageStats',
+    primaryKey: 'userId',
+    
+    // Attribute-Definitionen
+    attributes: {
+        userId: 'string',           // PK: User ID
+        totalSessions: 'number',    // Gesamtanzahl Sessions
+        totalTasksAttempted: 'number', // Gesamtanzahl versuchter Aufgaben
+        totalTasksCompleted: 'number', // Gesamtanzahl abgeschlossener Aufgaben
+        totalTimeSpent: 'number',   // Gesamtzeit in Sekunden
+        averageSessionLength: 'number', // Durchschnittliche Session-Länge
+        lastActiveDate: 'timestamp',// Letzter aktiver Tag
+        firstActiveDate: 'timestamp',// Erster aktiver Tag
+        currentStreak: 'number',    // Aktuelle Streak (Tage in Folge)
+        longestStreak: 'number',    // Längste Streak
+        weeklyActivity: 'map',      // { "2024-W01": 5, "2024-W02": 3, ... }
+        monthlyActivity: 'map',     // { "2024-01": 15, "2024-02": 20, ... }
+        topicsExplored: 'array',    // Liste aller bearbeiteten Themen
+        preferredDifficulty: 'string', // Bevorzugte Schwierigkeit
+        peakHour: 'number',         // Uhrzeit mit höchster Aktivität (0-23)
+        lastUpdated: 'timestamp'
+    },
+    
+    defaults: {
+        totalSessions: 0,
+        totalTasksAttempted: 0,
+        totalTasksCompleted: 0,
+        totalTimeSpent: 0,
+        averageSessionLength: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        weeklyActivity: {},
+        monthlyActivity: {},
+        topicsExplored: [],
+        preferredDifficulty: 'fortgeschritten',
+        peakHour: 16
+    }
+};
+
 // ==================== Helper Functions ====================
 
 // Validiere Daten gegen Schema
@@ -307,6 +427,9 @@ if (typeof module !== 'undefined' && module.exports) {
         BehaviorAnalyticsSchema,
         SessionSchema,
         LearningGoalsSchema,
+        ErrorBalanceSchema,
+        CompetencyRatingsSchema,
+        UsageStatsSchema,
         validateAgainstSchema,
         applyDefaults,
         generateTimestamp,
@@ -323,6 +446,9 @@ if (typeof window !== 'undefined') {
         BehaviorAnalyticsSchema,
         SessionSchema,
         LearningGoalsSchema,
+        ErrorBalanceSchema,
+        CompetencyRatingsSchema,
+        UsageStatsSchema,
         validateAgainstSchema,
         applyDefaults,
         generateTimestamp,

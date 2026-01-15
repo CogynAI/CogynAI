@@ -2,8 +2,16 @@
 // Generiert kontextuelle Ratschläge für optimale KI-Interaktion
 
 class PromptAdvisor {
-    constructor(dataAggregator) {
+    constructor(dataAggregator, strengthWeaknessTracker = null) {
         this.dataAggregator = dataAggregator;
+        this.strengthWeaknessTracker = strengthWeaknessTracker;
+    }
+    
+    /**
+     * Setze den StrengthWeaknessTracker (für späte Initialisierung)
+     */
+    setStrengthWeaknessTracker(tracker) {
+        this.strengthWeaknessTracker = tracker;
     }
     
     // ==================== Main Advice Generation ====================
@@ -21,6 +29,12 @@ class PromptAdvisor {
             const userContext = await this.dataAggregator.getUserContext(userId, currentTopic);
             
             let advice = this._buildAdviceStructure(userContext, context);
+            
+            // Kompetenz-Profil vom StrengthWeaknessTracker hinzufügen
+            if (this.strengthWeaknessTracker && userId) {
+                const competencyAdvice = await this._buildCompetencyProfileSection(userId, currentTopic);
+                advice += competencyAdvice;
+            }
             
             // Spezielle Intervention-Advice hinzufügen
             if (intervention && intervention.type === 'prompt_advice') {
@@ -288,6 +302,111 @@ class PromptAdvisor {
     
     _getDefaultAdvice() {
         return '\n\n=== NUTZER-KONTEXT ===\nKeine Nutzerdaten verfügbar. Nutze Standard-Ansatz.\n';
+    }
+    
+    /**
+     * Baut eine Kompetenz-Profil Sektion basierend auf StrengthWeaknessTracker-Daten
+     * @param {string} userId - User ID
+     * @param {string} currentTopic - Aktuelles Thema
+     * @returns {string} - Formatierter Advice-Text
+     */
+    async _buildCompetencyProfileSection(userId, currentTopic = null) {
+        try {
+            if (!this.strengthWeaknessTracker) {
+                return '';
+            }
+            
+            const profile = await this.strengthWeaknessTracker.getFullProfile(userId);
+            
+            if (!profile || profile.competencies.all.length === 0 && profile.errors.stats.total === 0) {
+                return ''; // Noch keine Daten
+            }
+            
+            let section = '\n=== KOMPETENZ-PROFIL (Detailliert) ===\n';
+            
+            // Starke Kompetenzen
+            if (profile.competencies.strong.length > 0) {
+                section += 'Starke mathematische Kompetenzen:\n';
+                profile.competencies.strong.slice(0, 4).forEach(c => {
+                    section += `  - ${c.name}: ${c.weightedAverage.toFixed(1)}/10`;
+                    if (c.trend === 'improving') section += ' ↑';
+                    else if (c.trend === 'declining') section += ' ↓';
+                    section += '\n';
+                });
+            }
+            
+            // Schwache Kompetenzen
+            if (profile.competencies.weak.length > 0) {
+                section += 'Schwache mathematische Kompetenzen (braucht Unterstützung):\n';
+                profile.competencies.weak.slice(0, 4).forEach(c => {
+                    section += `  - ${c.name}: ${c.weightedAverage.toFixed(1)}/10`;
+                    if (c.trend === 'improving') section += ' ↑';
+                    else if (c.trend === 'declining') section += ' ↓';
+                    section += '\n';
+                });
+            }
+            
+            // Fehlerbilanzen
+            if (profile.errors.topErrorTypes.length > 0) {
+                section += 'Häufige Fehlertypen:\n';
+                const errorTypeNames = {
+                    logic: 'Logikfehler (falscher Ansatz)',
+                    calc: 'Rechenfehler (richtige Idee, falsche Rechnung)',
+                    followup: 'Folgefehler (aus vorherigem Fehler)',
+                    formal: 'Formfehler (Notation/Darstellung)'
+                };
+                profile.errors.topErrorTypes.slice(0, 3).forEach(e => {
+                    section += `  - ${errorTypeNames[e.type] || e.type}: ${e.count}x\n`;
+                });
+            }
+            
+            // Themen mit vielen Fehlern
+            if (profile.errors.topErrorTopics.length > 0) {
+                section += 'Themen mit häufigen Fehlern:\n';
+                profile.errors.topErrorTopics.slice(0, 3).forEach(t => {
+                    const topicName = window.MATH_TOPICS?.[t.topic]?.name || t.topic;
+                    section += `  - ${topicName}: ${t.count} Fehler\n`;
+                });
+            }
+            
+            // Themen-spezifische Empfehlung
+            if (currentTopic) {
+                const topicAnalysis = await this.strengthWeaknessTracker.getTopicAnalysis(userId, currentTopic);
+                if (topicAnalysis && topicAnalysis.recommendation) {
+                    section += `\nZum aktuellen Thema "${topicAnalysis.topicName}":\n`;
+                    section += `  ${topicAnalysis.recommendation.message}\n`;
+                    if (topicAnalysis.competencies.weak.length > 0) {
+                        section += `  Achte besonders auf: ${topicAnalysis.competencies.weak.map(c => c.name).join(', ')}\n`;
+                    }
+                }
+            }
+            
+            // Zusammenfassung/Empfehlung
+            section += '\nEMPFEHLUNG FÜR DIESE INTERAKTION:\n';
+            
+            if (profile.competencies.weak.length > 0) {
+                const weakest = profile.competencies.weak[0];
+                section += `- Bei "${weakest.name}" extra detailliert erklären und mehr Beispiele geben.\n`;
+            }
+            
+            if (profile.errors.topErrorTypes.length > 0) {
+                const topError = profile.errors.topErrorTypes[0];
+                if (topError.type === 'logic') {
+                    section += '- Nutzer macht oft Logikfehler - Lösungsansatz besonders klar erklären.\n';
+                } else if (topError.type === 'calc') {
+                    section += '- Nutzer macht oft Rechenfehler - Zwischenschritte betonen und langsamer vorgehen.\n';
+                }
+            }
+            
+            if (profile.summary.overallLevel === 'needs_attention') {
+                section += '- Nutzer braucht besondere Unterstützung - ermutigend und geduldig sein.\n';
+            }
+            
+            return section;
+        } catch (error) {
+            console.error('[PromptAdvisor] _buildCompetencyProfileSection error:', error);
+            return '';
+        }
     }
     
     _buildInterventionAdvice(intervention) {

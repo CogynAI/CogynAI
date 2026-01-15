@@ -15,7 +15,10 @@ class DBMock {
             'MathTutor-PerformanceMetrics',
             'MathTutor-BehaviorAnalytics',
             'MathTutor-Sessions',
-            'MathTutor-LearningGoals'
+            'MathTutor-LearningGoals',
+            'MathTutor-ErrorBalance',
+            'MathTutor-CompetencyRatings',
+            'MathTutor-UsageStats'
         ];
         
         tables.forEach(table => {
@@ -68,8 +71,8 @@ class DBMock {
             
             // Bestimme Key basierend auf Schema
             let itemKey;
-            if (item.userId && item.topic !== undefined) {
-                // Hat Sort Key (topic)
+            if (item.userId && item.topic !== undefined && !item.balanceKey) {
+                // Hat Sort Key (topic) - CompetencyTracking
                 itemKey = this._generateItemKey({ userId: item.userId, topic: item.topic });
             } else if (item.userId && item.sessionId) {
                 // Session Table
@@ -77,6 +80,12 @@ class DBMock {
             } else if (item.userId && item.goalId) {
                 // Goals Table
                 itemKey = this._generateItemKey({ userId: item.userId, goalId: item.goalId });
+            } else if (item.userId && item.balanceKey) {
+                // ErrorBalance Table
+                itemKey = this._generateItemKey({ userId: item.userId, balanceKey: item.balanceKey });
+            } else if (item.userId && item.competencyId) {
+                // CompetencyRatings Table
+                itemKey = this._generateItemKey({ userId: item.userId, competencyId: item.competencyId });
             } else if (item.userId && item.timestamp) {
                 // Performance/Behavior mit timestamp
                 itemKey = this._generateItemKey({ userId: item.userId, timestamp: item.timestamp });
@@ -84,7 +93,7 @@ class DBMock {
                 // Behavior mit behaviorKey
                 itemKey = this._generateItemKey({ userId: item.userId, behaviorKey: item.behaviorKey });
             } else if (item.userId) {
-                // Nur Primary Key (User Profile)
+                // Nur Primary Key (User Profile, UsageStats)
                 itemKey = item.userId;
             } else {
                 throw new Error('Item must have at least userId');
@@ -270,7 +279,10 @@ class DBMock {
                 'MathTutor-PerformanceMetrics',
                 'MathTutor-BehaviorAnalytics',
                 'MathTutor-Sessions',
-                'MathTutor-LearningGoals'
+                'MathTutor-LearningGoals',
+                'MathTutor-ErrorBalance',
+                'MathTutor-CompetencyRatings',
+                'MathTutor-UsageStats'
             ];
             
             for (const table of tables) {
@@ -293,7 +305,10 @@ class DBMock {
             'MathTutor-PerformanceMetrics',
             'MathTutor-BehaviorAnalytics',
             'MathTutor-Sessions',
-            'MathTutor-LearningGoals'
+            'MathTutor-LearningGoals',
+            'MathTutor-ErrorBalance',
+            'MathTutor-CompetencyRatings',
+            'MathTutor-UsageStats'
         ];
         
         tables.forEach(table => {
@@ -328,7 +343,10 @@ class DBMock {
             'MathTutor-PerformanceMetrics',
             'MathTutor-BehaviorAnalytics',
             'MathTutor-Sessions',
-            'MathTutor-LearningGoals'
+            'MathTutor-LearningGoals',
+            'MathTutor-ErrorBalance',
+            'MathTutor-CompetencyRatings',
+            'MathTutor-UsageStats'
         ];
         
         tables.forEach(table => {
