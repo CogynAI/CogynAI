@@ -538,6 +538,74 @@ function fixCommonTypos(content) {
 }
 
 /**
+ * Erkennt LaTeX-Befehle in normalem Text und umgibt sie mit Delimitern für MathJax
+ * Nützlich für Feedback-Texte, die sowohl Text als auch Formeln enthalten
+ * @param {string} text - Text mit potenziellem LaTeX
+ * @returns {string} - Text mit LaTeX-Abschnitten in \(...\) Delimitern
+ */
+function wrapLatexInText(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    // Wenn bereits Delimiter vorhanden sind, nichts tun
+    if (text.includes('\\(') || text.includes('\\[') || text.includes('$')) {
+        return text;
+    }
+    
+    // Prüfe ob überhaupt LaTeX-Befehle im Text sind
+    if (!text.includes('\\')) {
+        return text;
+    }
+    
+    // Einfacherer Ansatz: Finde zusammenhängende mathematische Ausdrücke
+    // die LaTeX-Befehle enthalten
+    // Pattern erkennt: Zahlen, Variablen, Operatoren, und LaTeX-Befehle als zusammenhängende Formel
+    // z.B. "25\cdot 2" oder "\sqrt{50}=5\sqrt{2}"
+    
+    // Dieses Pattern findet:
+    // - Optionale führende Zahl/Variable/Klammer
+    // - Ein LaTeX-Befehl (\command mit optionalen {})
+    // - Optionale folgende mathematische Ausdrücke (Zahlen, Operatoren, weitere LaTeX)
+    const latexFormulaPattern = /(?:[0-9a-zA-Z()\[\]]*\s*)?\\[a-zA-Z]+(?:\{[^{}]*\}|\[[^\[\]]*\])*(?:\s*[=+\-*/^_()0-9a-zA-Z{}]*(?:\\[a-zA-Z]+(?:\{[^{}]*\}|\[[^\[\]]*\])*)?)*/g;
+    
+    let result = text;
+    const matches = text.match(latexFormulaPattern);
+    
+    if (matches) {
+        // Dedupliziere und sortiere nach Länge (längste zuerst)
+        const uniqueMatches = [...new Set(matches)]
+            .map(m => m.trim())
+            .filter(m => m.length > 0 && m.includes('\\'))
+            .sort((a, b) => b.length - a.length);
+        
+        // Verwende einen Marker um bereits ersetzte Bereiche zu markieren
+        const marker = '\u0000LATEX_WRAPPED\u0000';
+        
+        for (const match of uniqueMatches) {
+            // Prüfe ob dieser Match bereits Teil eines längeren ersetzten Matches ist
+            if (result.includes(marker + match) || result.includes(match + marker)) {
+                continue;
+            }
+            
+            // Sanitiere den LaTeX-Inhalt
+            const sanitized = typeof sanitizeLatex === 'function' 
+                ? sanitizeLatex(match) 
+                : match;
+            
+            // Escape special regex characters für die Ersetzung
+            const escaped = match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            
+            // Ersetze das Match mit LaTeX-Delimitern
+            result = result.replace(new RegExp(escaped, 'g'), `${marker}\\(${sanitized}\\)${marker}`);
+        }
+        
+        // Entferne die Marker
+        result = result.replace(new RegExp(marker, 'g'), '');
+    }
+    
+    return result;
+}
+
+/**
  * Sanitiert einen einzelnen Step aus der API-Response
  */
 function sanitizeStepLatex(step) {
@@ -882,22 +950,34 @@ function validateErrorMarkings(analysis) {
     let errorsAdded = 0;
     
     // Phase 1: Entferne falsche Fehlermarkierungen
-    for (let i = 1; i < correctedSteps.length; i++) {
-        const currentStep = correctedSteps[i];
-        const previousStep = correctedSteps[i - 1];
-        
-        // Nur prüfen wenn als Fehler markiert (außer Folgefehler)
-        if (currentStep.errorType && currentStep.errorType !== 'none' && currentStep.errorType !== 'followup') {
-            const validation = validateStepTransformation(previousStep.latex, currentStep.latex);
+    // DEAKTIVIERT: Diese aggressive Validierung entfernte fälschlicherweise echte Fehler,
+    // weil die LaTeX-zu-Math Konvertierung bei komplexen Ausdrücken unzuverlässig ist.
+    // Die KI-Analyse ist vertrauenswürdiger als die programmatische Validierung.
+    const ENABLE_ERROR_REMOVAL = false;
+    
+    if (ENABLE_ERROR_REMOVAL) {
+        for (let i = 1; i < correctedSteps.length; i++) {
+            const currentStep = correctedSteps[i];
+            const previousStep = correctedSteps[i - 1];
             
-            if (validation.isValid === true) {
-                console.log(`[MathValidator] Step ${i + 1} marked as ${currentStep.errorType} but is mathematically correct. Removing error marking.`);
-                correctedSteps[i] = {
-                    ...currentStep,
-                    errorType: 'none',
-                    _validationNote: `Originally marked as ${currentStep.errorType}, but validated as correct`
-                };
-                correctionsMade++;
+            // Nur prüfen wenn als Fehler markiert (außer Folgefehler)
+            if (currentStep.errorType && currentStep.errorType !== 'none' && currentStep.errorType !== 'followup') {
+                const validation = validateStepTransformation(previousStep.latex, currentStep.latex);
+                
+                // Nur entfernen wenn wir SEHR sicher sind (Äquivalenz bestätigt)
+                if (validation.isValid === true && validation.reason && validation.reason.includes('quivalent')) {
+                    console.log(`[MathValidator] Step ${i + 1} marked as ${currentStep.errorType} but is mathematically correct. Removing error marking.`, {
+                        prevLatex: previousStep.latex,
+                        currLatex: currentStep.latex,
+                        reason: validation.reason
+                    });
+                    correctedSteps[i] = {
+                        ...currentStep,
+                        errorType: 'none',
+                        _validationNote: `Originally marked as ${currentStep.errorType}, but validated as correct`
+                    };
+                    correctionsMade++;
+                }
             }
         }
     }
@@ -961,6 +1041,7 @@ if (typeof window !== 'undefined') {
         stripLatexDelimiters,
         removeColorCommands,
         sanitizeStepLatex,
+        wrapLatexInText,
         LATEX_COMMANDS
     };
     
@@ -1453,10 +1534,14 @@ class TestManager {
             
         // Feedback
         if (analysis.feedback) {
+            // LaTeX im Feedback-Text mit Delimitern umgeben für MathJax-Rendering
+            const formattedFeedback = typeof wrapLatexInText === 'function' 
+                ? wrapLatexInText(analysis.feedback.summarySentence || 'Kein Feedback')
+                : (analysis.feedback.summarySentence || 'Kein Feedback');
             html += `
                 <div class="test-feedback">
                     <h5><i class="fas fa-comment"></i> KI-Feedback</h5>
-                    <p class="feedback-summary">${analysis.feedback.summarySentence || 'Kein Feedback'}</p>
+                    <p class="feedback-summary">${formattedFeedback}</p>
                 </div>
             `;
         }
@@ -1464,13 +1549,16 @@ class TestManager {
         // Detailed Feedback anzeigen (Level 3)
         if (analysis.detailedFeedback) {
             const df = analysis.detailedFeedback;
+            // Helper-Funktion um LaTeX in Text zu wrappen
+            const formatText = (text) => typeof wrapLatexInText === 'function' ? wrapLatexInText(text) : text;
+            
             html += `<div class="test-detailed-feedback">`;
             
             if (df.strengths && df.strengths.length > 0) {
                 html += `
                     <div class="feedback-section feedback-strengths">
                         <h5><i class="fas fa-check-circle"></i> Was gut war</h5>
-                        <ul>${df.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                        <ul>${df.strengths.map(s => `<li>${formatText(s)}</li>`).join('')}</ul>
                     </div>
                 `;
             }
@@ -1479,7 +1567,7 @@ class TestManager {
                 html += `
                     <div class="feedback-section feedback-weaknesses">
                         <h5><i class="fas fa-exclamation-triangle"></i> Verbesserungspotential</h5>
-                        <ul>${df.weaknesses.map(w => `<li>${w}</li>`).join('')}</ul>
+                        <ul>${df.weaknesses.map(w => `<li>${formatText(w)}</li>`).join('')}</ul>
                     </div>
                 `;
             }
@@ -1488,7 +1576,7 @@ class TestManager {
                 html += `
                     <div class="feedback-section feedback-tips">
                         <h5><i class="fas fa-lightbulb"></i> Merksätze</h5>
-                        <ul>${df.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+                        <ul>${df.tips.map(t => `<li>${formatText(t)}</li>`).join('')}</ul>
                     </div>
                 `;
             }
@@ -1496,7 +1584,7 @@ class TestManager {
             if (df.encouragement) {
                 html += `
                     <div class="feedback-section feedback-encouragement">
-                        <p><i class="fas fa-heart"></i> ${df.encouragement}</p>
+                        <p><i class="fas fa-heart"></i> ${formatText(df.encouragement)}</p>
                     </div>
                 `;
             }
@@ -2085,91 +2173,16 @@ class MathTutorAI {
 
     /**
      * Update bottom bar based on current context
+     * DEAKTIVIERT: Bottom bar wird nicht mehr verwendet, da die Buttons
+     * bereits in den jeweiligen Tabs vorhanden sind
      */
     updateBottomBar(context) {
         const bar = document.getElementById('bottom-bar');
         if (!bar) return;
-
-        // Clear existing content
+        
+        // Bottom bar komplett ausblenden - Buttons sind bereits in den Tabs
+        bar.classList.remove('visible');
         bar.innerHTML = '';
-
-        switch(context) {
-            case 'text-input':
-                bar.innerHTML = `
-                    <div></div>
-                    <button class="btn btn-primary" id="bottom-analyze-btn">
-                        <i class="fas fa-brain"></i> Analysieren
-                    </button>
-                    <div></div>
-                `;
-                bar.classList.add('visible');
-                this.attachBottomBarListeners('input');
-                break;
-
-            case 'image-upload':
-                bar.innerHTML = `
-                    <div></div>
-                    <button class="btn btn-primary" id="bottom-analyze-image-btn">
-                        <i class="fas fa-brain"></i> Bild analysieren
-                    </button>
-                    <div></div>
-                `;
-                bar.classList.add('visible');
-                this.attachBottomBarListeners('image');
-                break;
-
-            case 'generate-task':
-                bar.innerHTML = `
-                    <button class="btn btn-secondary" id="bottom-random-btn">
-                        <i class="fas fa-dice"></i> Zufall
-                    </button>
-                    <button class="btn btn-primary" id="bottom-generate-btn">
-                        <i class="fas fa-magic"></i> Generieren
-                    </button>
-                    <div></div>
-                `;
-                bar.classList.add('visible');
-                this.attachBottomBarListeners('generate');
-                break;
-
-            case 'abi-generate':
-                bar.innerHTML = `
-                    <div></div>
-                    <button class="btn btn-primary" id="bottom-abi-btn">
-                        <i class="fas fa-graduation-cap"></i> Abitur-Aufgabe erstellen
-                    </button>
-                    <div></div>
-                `;
-                bar.classList.add('visible');
-                this.attachBottomBarListeners('abitur');
-                break;
-
-            case 'solving':
-                bar.innerHTML = `
-                    <button class="btn btn-secondary" id="bottom-back-btn">
-                        <i class="fas fa-arrow-left"></i> Zurück
-                    </button>
-                    <button class="btn btn-hint" id="bottom-hint-btn">
-                        <i class="fas fa-lightbulb"></i> Hint
-                    </button>
-                    <div class="btn-group">
-                        <button class="btn btn-success" id="bottom-solution-btn" disabled>
-                            <i class="fas fa-eye"></i> Lösung
-                        </button>
-                        <button class="btn btn-primary" id="bottom-next-btn">
-                            Nächste <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                `;
-                bar.classList.add('visible');
-                this.attachBottomBarListeners('solving');
-                break;
-
-            default:
-                // Dashboard or other - hide bottom bar
-                bar.classList.remove('visible');
-                break;
-        }
     }
 
     /**
@@ -2809,11 +2822,12 @@ KERNREGEL: Schülertext 1:1 in LaTeX (Fehler beibehalten, NICHT korrigieren!)
 
 AUFGABEN:
 1. Schritte zerlegen (je Schritt eine Umformung)
-2. operation pro Schritt (außer letztem): z.B. ":2", "+3", "zgf."
-3. errorType: logic (P1) > calc (P2) > followup (P3) > formal > none
-4. competencyAnalysis: Bewerte gezeigte Kompetenzen (1-10)
+2. index MUSS fortlaufend sein: 1, 2, 3, ... (NICHT mehrmals dieselbe Nummer!)
+3. operation pro Schritt (außer letztem): z.B. ":2", "+3", "zgf."
+4. errorType: logic (P1) > calc (P2) > followup (P3) > formal > none
+5. competencyAnalysis: Bewerte gezeigte Kompetenzen (1-10)
 
-OUTPUT: {"steps":[...],"isCorrect":true/false,"feedback":{...},"competencyAnalysis":{...}}
+OUTPUT: {"steps":[{"index":1,...},{"index":2,...}],"isCorrect":true/false,"feedback":{...},"competencyAnalysis":{...}}
 Nur reiner LaTeX (keine Delimiter).
 ${competencySchemaSection}${studentContextSection}${previousFeedbackSection}`;
 
@@ -3093,6 +3107,14 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
         // Sanitiere jeden Step
         if (parsedResponse.steps && Array.isArray(parsedResponse.steps)) {
             parsedResponse.steps = parsedResponse.steps.map(step => sanitizeStepLatex(step));
+        }
+
+        // Normalisiere Indizes auf 1, 2, 3, ... (behebt doppelte Schritt-Nummerierung)
+        if (parsedResponse.steps && Array.isArray(parsedResponse.steps)) {
+            parsedResponse.steps = parsedResponse.steps.map((step, idx) => ({
+                ...step,
+                index: idx + 1
+            }));
         }
 
         // Stelle sicher, dass Hints vorhanden und sanitisiert sind
@@ -5337,9 +5359,13 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         if (analysis.feedback && analysis.feedback.summarySentence) {
             const feedbackSummary = document.createElement('div');
             feedbackSummary.className = 'feedback-summary-box';
+            // LaTeX im Feedback-Text mit Delimitern umgeben für MathJax-Rendering
+            const formattedFeedback = typeof wrapLatexInText === 'function' 
+                ? wrapLatexInText(analysis.feedback.summarySentence)
+                : analysis.feedback.summarySentence;
             feedbackSummary.innerHTML = `
                 <i class="fas fa-comment-dots"></i>
-                <span>${analysis.feedback.summarySentence}</span>
+                <span>${formattedFeedback}</span>
             `;
             feedbackContent.appendChild(feedbackSummary);
         }
@@ -5635,9 +5661,13 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             if (mapping && mapping.explanation) {
                 const explanationRow = document.createElement('div');
                 explanationRow.className = 'comparison-explanation';
+                // LaTeX im Erklärungstext formatieren
+                const formattedExplanation = typeof wrapLatexInText === 'function' 
+                    ? wrapLatexInText(mapping.explanation) 
+                    : mapping.explanation;
                 explanationRow.innerHTML = `
                     <i class="fas fa-info-circle"></i>
-                    <span>${mapping.explanation}</span>
+                    <span>${formattedExplanation}</span>
                 `;
                 container.appendChild(explanationRow);
             }
@@ -5661,13 +5691,16 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         const content = document.createElement('div');
         content.className = 'detailed-feedback-content';
 
+        // Helper-Funktion um LaTeX in Text zu wrappen
+        const formatText = (text) => typeof wrapLatexInText === 'function' ? wrapLatexInText(text) : text;
+
         // Stärken
         if (detailedFeedback.strengths && detailedFeedback.strengths.length > 0) {
             const section = document.createElement('div');
             section.className = 'feedback-section feedback-strengths';
             section.innerHTML = `
                 <h5><i class="fas fa-check-circle"></i> Was gut war</h5>
-                <ul>${detailedFeedback.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                <ul>${detailedFeedback.strengths.map(s => `<li>${formatText(s)}</li>`).join('')}</ul>
             `;
             content.appendChild(section);
         }
@@ -5678,7 +5711,7 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             section.className = 'feedback-section feedback-weaknesses';
             section.innerHTML = `
                 <h5><i class="fas fa-exclamation-triangle"></i> Verbesserungspotential</h5>
-                <ul>${detailedFeedback.weaknesses.map(w => `<li>${w}</li>`).join('')}</ul>
+                <ul>${detailedFeedback.weaknesses.map(w => `<li>${formatText(w)}</li>`).join('')}</ul>
             `;
             content.appendChild(section);
         }
@@ -5689,7 +5722,7 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             section.className = 'feedback-section feedback-tips';
             section.innerHTML = `
                 <h5><i class="fas fa-lightbulb"></i> Merksätze</h5>
-                <ul>${detailedFeedback.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+                <ul>${detailedFeedback.tips.map(t => `<li>${formatText(t)}</li>`).join('')}</ul>
             `;
             content.appendChild(section);
         }
@@ -5698,7 +5731,7 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         if (detailedFeedback.encouragement) {
             const section = document.createElement('div');
             section.className = 'feedback-section feedback-encouragement';
-            section.innerHTML = `<p><i class="fas fa-heart"></i> ${detailedFeedback.encouragement}</p>`;
+            section.innerHTML = `<p><i class="fas fa-heart"></i> ${formatText(detailedFeedback.encouragement)}</p>`;
             content.appendChild(section);
         }
 
