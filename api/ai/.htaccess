@@ -1,0 +1,10 @@
+# Cogyn AI Proxy - URL Rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/ai/
+    
+    # Alle Requests an chat.php weiterleiten
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ chat.php [QSA,L]
+</IfModule>

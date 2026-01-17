@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Weiterleitung - Cogyn</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #0D3D3D 0%, #1a5f5f 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+        }
+        .spinner {
+            border: 4px solid rgba(64, 224, 208, 0.3);
+            border-top: 4px solid #40E0D0;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .btn {
+            display: inline-block;
+            margin: 10px;
+            padding: 12px 24px;
+            background: #40E0D0;
+            color: #0D3D3D;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #5FFFF5;
+        }
+        .info {
+            margin-top: 30px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h1>🚀 Weiterleitung zu Cogyn...</h1>
+        <p>Du wirst automatisch weitergeleitet.</p>
+
+        <div style="margin-top: 30px;">
+            <p><strong>Falls die Weiterleitung nicht funktioniert:</strong></p>
+            <a href="https://cogyn.app/login.html" class="btn">Zur Anmeldung</a>
+            <a href="https://cogyn.app/index.html" class="btn">Zur App</a>
+        </div>
+
+        <div class="info">
+            <p><strong>💡 Tipp:</strong> Speichere <code>https://cogyn.app</code> als Lesezeichen!</p>
+            <p style="font-size: 12px; margin-top: 20px;">
+                Wenn du diese Seite öfter siehst, leere bitte deinen Browser-Cache.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Intelligente Weiterleitung basierend auf Auth-Status
+        function redirect() {
+            // Prüfe ob Token existiert
+            const token = localStorage.getItem('auth_token');
+
+            // Debug-Info
+            console.log('[Redirect] Token gefunden:', !!token);
+            console.log('[Redirect] Current URL:', window.location.href);
+
+            // Verhindere Endlosschleife
+            const isRedirecting = sessionStorage.getItem('is_redirecting');
+            if (isRedirecting) {
+                console.warn('[Redirect] Redirect-Loop erkannt, stoppe.');
+                return;
+            }
+
+            sessionStorage.setItem('is_redirecting', 'true');
+
+            // Weiterleitung
+            if (token) {
+                console.log('[Redirect] -> index.html (authenticated)');
+                window.location.replace('https://cogyn.app/index.html');
+            } else {
+                console.log('[Redirect] -> login.html (not authenticated)');
+                window.location.replace('https://cogyn.app/login.html');
+            }
+        }
+
+        // Sofort ausführen
+        redirect();
+
+        // Fallback nach 2 Sekunden
+        setTimeout(() => {
+            if (window.location.href.includes('defaultsite')) {
+                window.location.replace('https://cogyn.app/login.html');
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

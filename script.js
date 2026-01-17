@@ -35,12 +35,16 @@ const ERROR_ANALYSIS_SCHEMA = {
                             enum: ["none", "logic", "calc", "followup", "formal"],
                             description: "Fehlertyp: none=korrekt, logic=Logikfehler, calc=Rechenfehler, followup=Folgefehler, formal=Formfehler"
                         },
+                        hintQuestion: {
+                            type: "string",
+                            description: "Eine kurze Leitfrage die den Schüler zum Nachdenken anregt, z.B. 'Was ergibt (-3)²?', 'Was passiert mit dem Vorzeichen?', 'Wie löst man diese Klammer auf?'. Leer bei errorType='none'."
+                        },
                         operation: {
                             type: "string",
                             description: "Rechenoperation die zum NÄCHSTEN Schritt führt, z.B. ':2x' (durch 2x teilen), 'zgf.' (zusammengefasst), '+3', '-5', '·2'. Leer lassen beim letzten Schritt."
                         }
                     },
-                    required: ["index", "rawText", "latex", "errorType"],
+                    required: ["index", "rawText", "latex", "errorType", "hintQuestion"],
                     additionalProperties: false
                 }
             },
@@ -117,18 +121,21 @@ ERROR_ANALYSIS_SCHEMA.schema.properties.hints = {
         },
         level2: {
             type: "array",
-            description: "Stufe-2-Hints: Schrittbezogene Hinweise/Formeln",
+            description: "Stufe-2-Hints: Lösungskonzept andeuten OHNE Level 1 zu wiederholen! Level 1 zeigt WO der Fehler ist, Level 2 gibt Hinweis WIE man es lösen könnte.",
             items: {
                 type: "object",
                 properties: {
                     hintLevel: { type: "number", enum: [2] },
                     category: { type: "string", enum: ["formula_hint", "step_sequence"] },
                     stepIndex: { type: "number", description: "Bezug auf steps[index]" },
-                    title: { type: "string", description: "2-4 Wörter, z.B. 'Kardano-Formel'" },
-                    latex: { type: "string", description: "LaTeX ohne Delimiter" },
+                    solutionApproach: { 
+                        type: "string", 
+                        description: "Hinweis auf die richtige Lösungsmethode OHNE die Lösung zu verraten. NICHT wiederholen was falsch ist (das ist Level 1), SONDERN andeuten wie man es richtig macht. Z.B. 'Versuche die Summe erst aufzuteilen bevor du den Grenzwert bildest' oder 'Hier könnte die Substitution u=x² helfen' oder 'Denke an die Produktregel für Ableitungen'"
+                    },
+                    latex: { type: "string", description: "Optional: Relevante Formel als LaTeX ohne Delimiter, z.B. die allgemeine Form der Produktregel" },
                     color: { type: "string", enum: ["blue", "green"] }
                 },
-                required: ["hintLevel", "category", "stepIndex", "title", "latex", "color"],
+                required: ["hintLevel", "category", "stepIndex", "solutionApproach", "color"],
                 additionalProperties: false
             }
         }
@@ -188,21 +195,21 @@ ERROR_ANALYSIS_SCHEMA.schema.properties.comparison = {
 
 ERROR_ANALYSIS_SCHEMA.schema.properties.detailedFeedback = {
     type: "object",
-    description: "Ausführliches Feedback bei Korrektur nach Fehlern oder Level 3",
+    description: "Ausführliches, inhaltlich relevantes Feedback. WICHTIG: Mathematisch konkret und aufgabenspezifisch!",
     properties: {
         strengths: {
             type: "array",
-            description: "Was gut war am Lösungsweg",
+            description: "Welche mathematischen KONZEPTE wurden korrekt angewandt? NICHT 'Schritt X war korrekt', SONDERN z.B. 'Die Anwendung der Kettenregel bei der Ableitung war korrekt' oder 'Der Ansatz mit Partialbruchzerlegung war richtig gewählt'",
             items: { type: "string" }
         },
         weaknesses: {
             type: "array",
-            description: "Identifizierte Schwächen/Fehlerquellen",
+            description: "Konkrete Lernempfehlungen mit mathematischem Bezug. NICHT 'Bei Schritt 8: logic', SONDERN z.B. 'Wiederhole den Zusammenhang zwischen Grenzwert und Konvergenz' oder 'Die Regel für das Ableiten von Produkten sollte nochmal geübt werden'",
             items: { type: "string" }
         },
         tips: {
             type: "array",
-            description: "Merksätze und Empfehlungen für die Zukunft",
+            description: "Aufgabenspezifische Merksätze die auf die KONKRETEN Fehler eingehen. NICHT generische Tipps wie 'Achte auf Vorzeichen', SONDERN z.B. 'Bei Partialbruchzerlegung: Erst prüfen ob der Grad des Zählers kleiner als der des Nenners ist' oder 'Beim Grenzwert von Summen: Erst prüfen ob beide Grenzwerte existieren'",
             items: { type: "string" }
         },
         encouragement: {
@@ -266,6 +273,282 @@ const ERROR_TYPE_COLOR_MAP = {
     'followup': 'orange',
     'formal': 'blue',
     'none': 'blue'
+};
+
+// ==================== Theory Analysis Schema für Theorie-Aufgaben ====================
+
+/**
+ * JSON-Schema für die strukturierte Theorie-Analyse-Antwort
+ * Für Definitionen, Beweise, Erklärungen, Vergleiche und Beispiele
+ */
+const THEORY_ANALYSIS_SCHEMA = {
+    name: "theory_analysis_response",
+    strict: true,
+    schema: {
+        type: "object",
+        properties: {
+            taskType: {
+                type: "string",
+                enum: ["definition", "explanation", "proof", "comparison", "example", "mixed"],
+                description: "Art der Theorie-Aufgabe"
+            },
+            subTasks: {
+                type: "array",
+                description: "Teilaufgaben mit Schüler-Antworten und Bewertung",
+                items: {
+                    type: "object",
+                    properties: {
+                        label: {
+                            type: "string",
+                            description: "Teilaufgaben-Label (z.B. 'a)', 'b)', '1.', oder leer bei Einzelaufgabe)"
+                        },
+                        question: {
+                            type: "string",
+                            description: "Die gestellte Teilfrage aus der Aufgabe"
+                        },
+                        questionType: {
+                            type: "string",
+                            enum: ["definition", "explanation", "proof", "comparison", "example"],
+                            description: "Art dieser spezifischen Teilaufgabe"
+                        },
+                        studentAnswer: {
+                            type: "string",
+                            description: "Originalantwort des Schülers (unverändert)"
+                        },
+                        correctness: {
+                            type: "string",
+                            enum: ["correct", "partial", "incorrect", "missing"],
+                            description: "Bewertung: correct=vollständig richtig, partial=teilweise richtig, incorrect=falsch, missing=nicht beantwortet"
+                        },
+                        explanation: {
+                            type: "string",
+                            description: "Detaillierte Erklärung warum die Antwort (nicht) korrekt ist. Bei Definitionen: Welche Aspekte fehlen/falsch sind"
+                        },
+                        correctAnswer: {
+                            type: "string",
+                            description: "Die korrekte Antwort (bei partial/incorrect). Bei Definitionen: Die vollständige, präzise Definition"
+                        },
+                        keyPoints: {
+                            type: "array",
+                            description: "Schlüsselaspekte die in der Antwort enthalten sein sollten",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    point: { type: "string", description: "Der Schlüsselaspekt" },
+                                    present: { type: "boolean", description: "War dieser Aspekt in der Schüler-Antwort enthalten?" }
+                                },
+                                required: ["point", "present"],
+                                additionalProperties: false
+                            }
+                        }
+                    },
+                    required: ["label", "question", "questionType", "studentAnswer", "correctness", "explanation"],
+                    additionalProperties: false
+                }
+            },
+            missingAnswers: {
+                type: "array",
+                description: "Labels der nicht beantworteten Teilaufgaben",
+                items: { type: "string" }
+            },
+            overallCorrect: {
+                type: "boolean",
+                description: "true wenn alle Teilaufgaben 'correct' sind"
+            },
+            overallAssessment: {
+                type: "string",
+                enum: ["excellent", "good", "partial", "needs_work", "incorrect"],
+                description: "Gesamtbewertung der Theorie-Antworten"
+            },
+            feedback: {
+                type: "object",
+                description: "Feedback zur Lösung",
+                properties: {
+                    summarySentence: {
+                        type: "string",
+                        description: "Kurze Zusammenfassung (1-2 Sätze)"
+                    },
+                    conceptualUnderstanding: {
+                        type: "string",
+                        description: "Einschätzung des konzeptionellen Verständnisses"
+                    },
+                    improvementSuggestion: {
+                        type: "string",
+                        description: "Konkreter Verbesserungsvorschlag"
+                    }
+                },
+                required: ["summarySentence"],
+                additionalProperties: false
+            },
+            hints: {
+                type: "object",
+                description: "Vorbereitete Hints als LEITFRAGEN die zum Nachdenken anregen",
+                properties: {
+                    level1: {
+                        type: "array",
+                        description: "Stufe-1-Hints: Kurze Leitfragen",
+                        items: {
+                            type: "object",
+                            properties: {
+                                hintLevel: { type: "number", enum: [1] },
+                                category: { type: "string", enum: ["definition_hint", "concept_hint", "structure_hint"] },
+                                label: { type: "string", description: "Eine LEITFRAGE die zum Nachdenken anregt, z.B. 'Was bedeutet X genau?', 'Welche Eigenschaft fehlt?'" },
+                                color: { type: "string", enum: ["orange", "yellow", "blue"] }
+                            },
+                            required: ["hintLevel", "category", "label", "color"],
+                            additionalProperties: false
+                        }
+                    },
+                    level2: {
+                        type: "array",
+                        description: "Stufe-2-Hints: Teilaufgaben-bezogene Leitfragen",
+                        items: {
+                            type: "object",
+                            properties: {
+                                hintLevel: { type: "number", enum: [2] },
+                                category: { type: "string", enum: ["missing_aspect", "wrong_concept", "incomplete"] },
+                                subTaskLabel: { type: "string", description: "Bezug auf Teilaufgabe (Label)" },
+                                title: { type: "string", description: "Kurze Überschrift" },
+                                text: { type: "string", description: "LEITFRAGE die zum Nachdenken anregt, z.B. 'Was fehlt in deiner Definition?'" },
+                                color: { type: "string", enum: ["blue", "green", "orange"] }
+                            },
+                            required: ["hintLevel", "category", "subTaskLabel", "title", "text", "color"],
+                            additionalProperties: false
+                        }
+                    }
+                },
+                required: ["level1", "level2"],
+                additionalProperties: false
+            }
+        },
+        required: ["taskType", "subTasks", "missingAnswers", "overallCorrect", "overallAssessment", "feedback", "hints"],
+        additionalProperties: false
+    }
+};
+
+// Kompetenz-Analyse für Theorie-Schema
+THEORY_ANALYSIS_SCHEMA.schema.properties.competencyAnalysis = {
+    type: "object",
+    description: "Analyse der mathematischen Kompetenzen bei Theorie-Aufgaben",
+    properties: {
+        identifiedCompetencies: {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    competencyId: { type: "string" },
+                    demonstrated: { type: "boolean" },
+                    rating: { type: "number" },
+                    evidence: { type: "string" }
+                },
+                required: ["competencyId", "demonstrated", "rating", "evidence"],
+                additionalProperties: false
+            }
+        },
+        overallAssessment: { type: "string" }
+    },
+    required: ["identifiedCompetencies", "overallAssessment"],
+    additionalProperties: false
+};
+
+// ==================== Word Problem Analysis Schema für Sachaufgaben ====================
+
+/**
+ * JSON-Schema für die strukturierte Sachaufgaben-Analyse
+ * Erweitert das Standard-Schema um Antwortsatz-Prüfung
+ */
+const WORD_PROBLEM_SCHEMA = {
+    name: "word_problem_analysis_response",
+    strict: true,
+    schema: {
+        type: "object",
+        properties: {
+            // Alle Properties vom ERROR_ANALYSIS_SCHEMA übernehmen
+            steps: ERROR_ANALYSIS_SCHEMA.schema.properties.steps,
+            uiElements: ERROR_ANALYSIS_SCHEMA.schema.properties.uiElements,
+            feedback: ERROR_ANALYSIS_SCHEMA.schema.properties.feedback,
+            hints: ERROR_ANALYSIS_SCHEMA.schema.properties.hints,
+            isCorrect: ERROR_ANALYSIS_SCHEMA.schema.properties.isCorrect,
+            comparison: ERROR_ANALYSIS_SCHEMA.schema.properties.comparison,
+            detailedFeedback: ERROR_ANALYSIS_SCHEMA.schema.properties.detailedFeedback,
+            competencyAnalysis: ERROR_ANALYSIS_SCHEMA.schema.properties.competencyAnalysis,
+            
+            // Neue Properties für Sachaufgaben
+            problemUnderstanding: {
+                type: "object",
+                description: "Analyse des Aufgabenverständnisses",
+                properties: {
+                    identifiedGiven: {
+                        type: "array",
+                        description: "Vom Schüler identifizierte gegebene Größen",
+                        items: { type: "string" }
+                    },
+                    identifiedSought: {
+                        type: "array",
+                        description: "Vom Schüler erkannte gesuchte Größen",
+                        items: { type: "string" }
+                    },
+                    correctApproach: {
+                        type: "boolean",
+                        description: "Hat der Schüler den richtigen Lösungsansatz gewählt?"
+                    }
+                },
+                required: ["identifiedGiven", "identifiedSought", "correctApproach"],
+                additionalProperties: false
+            },
+            answerSentence: {
+                type: "object",
+                description: "Analyse des Antwortsatzes",
+                properties: {
+                    present: {
+                        type: "boolean",
+                        description: "Ist ein Antwortsatz vorhanden?"
+                    },
+                    quality: {
+                        type: "string",
+                        enum: ["complete", "incomplete", "wrong_unit", "missing"],
+                        description: "Qualität des Antwortsatzes: complete=vollständig, incomplete=unvollständig, wrong_unit=falsche Einheit, missing=fehlt"
+                    },
+                    studentSentence: {
+                        type: "string",
+                        description: "Der Antwortsatz des Schülers (falls vorhanden)"
+                    },
+                    suggestion: {
+                        type: "string",
+                        description: "Vorschlag für einen korrekten Antwortsatz (bei Fehlern oder fehlendem Satz)"
+                    },
+                    issues: {
+                        type: "array",
+                        description: "Probleme mit dem Antwortsatz",
+                        items: {
+                            type: "string",
+                            enum: ["no_sentence", "no_unit", "wrong_unit", "incomplete_answer", "grammatically_incorrect", "context_missing"]
+                        }
+                    }
+                },
+                required: ["present", "quality"],
+                additionalProperties: false
+            },
+            realWorldContext: {
+                type: "object",
+                description: "Bewertung des Kontextbezugs",
+                properties: {
+                    maintained: {
+                        type: "boolean",
+                        description: "Wurde der Realweltbezug durchgehend beibehalten?"
+                    },
+                    feedback: {
+                        type: "string",
+                        description: "Feedback zum Kontextbezug"
+                    }
+                },
+                required: ["maintained"],
+                additionalProperties: false
+            }
+        },
+        required: ["steps", "uiElements", "feedback", "hints", "isCorrect", "answerSentence"],
+        additionalProperties: false
+    }
 };
 
 // ==================== LaTeX Sanitizer ====================
@@ -396,6 +679,9 @@ function sanitizeLatex(content) {
     // 0. Entferne Delimiter falls vorhanden
     sanitized = stripLatexDelimiters(sanitized);
     
+    // 0.5 Korrigiere deutsche Umlaute (babel-shortcuts)
+    sanitized = typeof fixGermanUmlauts === 'function' ? fixGermanUmlauts(sanitized) : sanitized;
+    
     // 1. Entferne Color-Befehle
     sanitized = removeColorCommands(sanitized);
 
@@ -420,6 +706,281 @@ function sanitizeLatex(content) {
     sanitized = fixCommonTypos(sanitized);
 
     return sanitized.trim();
+}
+
+/**
+ * Prüft ob ein String primär Text ist (im Gegensatz zu mathematischen Ausdrücken)
+ * @param {string} content - Der zu prüfende Inhalt
+ * @returns {boolean} - true wenn primär Text
+ */
+function isTextContent(content) {
+    if (!content || typeof content !== 'string') return false;
+    
+    // Entferne LaTeX-Befehle für die Analyse
+    const withoutLatex = content.replace(/\\[a-zA-Z]+(\{[^{}]*\}|\[[^\[\]]*\])*/g, '');
+    
+    // Zähle deutsche/englische Wörter (4+ Buchstaben)
+    const wordMatches = withoutLatex.match(/[a-zA-ZäöüÄÖÜß]{4,}/g) || [];
+    
+    // Zähle mathematische Symbole und Operatoren
+    const mathSymbols = content.match(/[+\-*/=<>≤≥≠∫∑∏√∂∇∞αβγδεθλμσωπ]/g) || [];
+    const latexCommands = content.match(/\\[a-zA-Z]+/g) || [];
+    
+    // Wenn mehr Wörter als Mathe-Elemente, ist es primär Text
+    const textScore = wordMatches.length;
+    const mathScore = mathSymbols.length + latexCommands.length;
+    
+    // Primär Text wenn: viele Wörter UND wenige Mathe-Elemente
+    // oder wenn Text sehr lang ist mit deutschen Wörtern
+    const hasGermanWords = /[äöüÄÖÜß]/.test(content) || 
+                          /\b(die|der|das|und|oder|ist|wird|werden|kann|können|bei|mit|von|für|zur|zum)\b/i.test(content);
+    
+    return (textScore > 2 && textScore > mathScore) || 
+           (hasGermanWords && textScore > 1) ||
+           content.includes('...') ||
+           content.includes('?') ||
+           /^[A-ZÄÖÜ][a-zäöüß]+ /.test(content); // Startet mit deutschem Wort
+}
+
+/**
+ * Korrigiert LaTeX babel-german Shortcuts zurück zu echten Umlauten
+ * Manche LaTeX-Outputs verwenden "a statt ä, "o statt ö, etc.
+ * @param {string} text - Text mit möglichen babel-shortcuts
+ * @returns {string} - Text mit korrigierten Umlauten
+ */
+function fixGermanUmlauts(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    return text
+        // Backslash + Umlaut direkt (z.B. \ä, \ü, \ö, \ß)
+        .replace(/\\ä/g, 'ä')
+        .replace(/\\ö/g, 'ö')
+        .replace(/\\ü/g, 'ü')
+        .replace(/\\Ä/g, 'Ä')
+        .replace(/\\Ö/g, 'Ö')
+        .replace(/\\Ü/g, 'Ü')
+        .replace(/\\ß/g, 'ß')
+        // Babel-shortcuts ("a, "o, etc.)
+        .replace(/"a/g, 'ä')
+        .replace(/"o/g, 'ö')
+        .replace(/"u/g, 'ü')
+        .replace(/"A/g, 'Ä')
+        .replace(/"O/g, 'Ö')
+        .replace(/"U/g, 'Ü')
+        .replace(/"s/g, 'ß')
+        // LaTeX-Befehle
+        .replace(/\\ss\b/g, 'ß')
+        .replace(/\\\"a/g, 'ä')
+        .replace(/\\\"o/g, 'ö')
+        .replace(/\\\"u/g, 'ü')
+        .replace(/\\\"A/g, 'Ä')
+        .replace(/\\\"O/g, 'Ö')
+        .replace(/\\\"U/g, 'Ü');
+}
+
+/**
+ * Wrappt LaTeX-Ausdrücke im Feedback-Text für MathJax-Rendering
+ * Erkennt Ausdrücke wie \frac{1}{2}, b^{2}, x_1, etc.
+ * @param {string} text - Feedback-Text mit eingebettetem LaTeX
+ * @returns {string} - Text mit gewrappten LaTeX-Ausdrücken
+ */
+function wrapLatexInFeedback(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    // Korrigiere deutsche Umlaute zuerst
+    let result = fixGermanUmlauts(text);
+    
+    // Regex für LaTeX-Ausdrücke im Fließtext
+    const latexPatterns = [
+        // LaTeX-Befehle: \frac{...}{...}, \sqrt{...}, \text{...}, etc.
+        /\\(?:frac|sqrt|text|mathbf|mathrm|sum|prod|int|lim|sin|cos|tan|log|ln|exp)\s*(?:\{[^{}]*\}|\[[^\[\]]*\])+/g,
+        // Einfache Befehle: \frac12, \pi, \alpha etc.
+        /\\(?:frac|pi|alpha|beta|gamma|delta|epsilon|varepsilon|theta|lambda|mu|sigma|omega|infty|pm|mp|times|div|cdot|leq|geq|neq|approx)\s*[0-9]*/g,
+        // Potenzen: x^2, x^{2}, b^{n}, etc.
+        /[a-zA-Z]\^(?:\{[^{}]+\}|[0-9a-zA-Z])/g,
+        // Indizes: x_1, x_{12}, a_n, etc.
+        /[a-zA-Z]_(?:\{[^{}]+\}|[0-9a-zA-Z])/g,
+        // Kombinationen: x_1^2, etc.
+        /[a-zA-Z](?:_(?:\{[^{}]+\}|[0-9a-zA-Z]))(?:\^(?:\{[^{}]+\}|[0-9a-zA-Z]))/g,
+    ];
+    
+    // Sammle alle Matches mit ihren Positionen
+    const matches = [];
+    latexPatterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(result)) !== null) {
+            matches.push({ start: match.index, end: match.index + match[0].length, text: match[0] });
+        }
+    });
+    
+    // Sortiere nach Position (rückwärts, damit Ersetzungen die Indizes nicht verschieben)
+    matches.sort((a, b) => b.start - a.start);
+    
+    // Entferne Duplikate und überlappende Matches
+    const uniqueMatches = [];
+    matches.forEach(m => {
+        const overlaps = uniqueMatches.some(u => 
+            (m.start >= u.start && m.start < u.end) || 
+            (m.end > u.start && m.end <= u.end)
+        );
+        if (!overlaps) {
+            uniqueMatches.push(m);
+        }
+    });
+    
+    // Ersetze LaTeX-Ausdrücke mit MathJax-Delimitern
+    uniqueMatches.forEach(m => {
+        const before = result.substring(0, m.start);
+        const after = result.substring(m.end);
+        // Prüfe ob bereits gewrappt
+        if (!before.endsWith('\\(') && !after.startsWith('\\)')) {
+            result = before + '\\(' + m.text + '\\)' + after;
+        }
+    });
+    
+    return result;
+}
+
+/**
+ * Konvertiert LaTeX-Symbole zu Unicode-Zeichen für reinen Text-Gebrauch
+ * Ideal für Hint-Labels und Titel, die kein MathJax-Rendering brauchen
+ * @param {string} text - Text mit möglichen LaTeX-Symbolen
+ * @returns {string} - Text mit Unicode-Symbolen
+ */
+function convertLatexSymbolsToUnicode(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    return text
+        // Mathbb (Mengen-Symbole)
+        .replace(/\\mathbb\s*\{?\s*R\s*\}?/g, 'ℝ')
+        .replace(/\\mathbb\s*\{?\s*N\s*\}?/g, 'ℕ')
+        .replace(/\\mathbb\s*\{?\s*Z\s*\}?/g, 'ℤ')
+        .replace(/\\mathbb\s*\{?\s*Q\s*\}?/g, 'ℚ')
+        .replace(/\\mathbb\s*\{?\s*C\s*\}?/g, 'ℂ')
+        // Griechische Buchstaben
+        .replace(/\\varepsilon/g, 'ε')
+        .replace(/\\epsilon/g, 'ε')
+        .replace(/\\delta/g, 'δ')
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\phi/g, 'φ')
+        .replace(/\\omega/g, 'ω')
+        // Mathematische Operatoren (lange Form zuerst!)
+        .replace(/\\infty/g, '∞')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\le\b/g, '≤')
+        .replace(/\\ge\b/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\pm/g, '±')
+        .replace(/\\sqrt/g, '√')
+        .replace(/\\sum/g, '∑')
+        .replace(/\\prod/g, '∏')
+        .replace(/\\int/g, '∫')
+        .replace(/\\partial/g, '∂')
+        .replace(/\\nabla/g, '∇')
+        .replace(/\\forall/g, '∀')
+        .replace(/\\exists/g, '∃')
+        .replace(/\\in\b/g, '∈')
+        .replace(/\\notin/g, '∉')
+        .replace(/\\subset/g, '⊂')
+        .replace(/\\subseteq/g, '⊆')
+        .replace(/\\cup/g, '∪')
+        .replace(/\\cap/g, '∩')
+        .replace(/\\rightarrow/g, '→')
+        .replace(/\\to\b/g, '→')
+        .replace(/\\Rightarrow/g, '⇒')
+        .replace(/\\leftarrow/g, '←')
+        .replace(/\\Leftarrow/g, '⇐')
+        .replace(/\\leftrightarrow/g, '↔')
+        .replace(/\\iff/g, '⇔')
+        // Sonstige Symbole
+        .replace(/\\lim/g, 'lim')
+        .replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)')
+        // LaTeX-Delimiter entfernen
+        .replace(/\\\(/g, '')
+        .replace(/\\\)/g, '')
+        .replace(/\\\[/g, '')
+        .replace(/\\\]/g, '')
+        .replace(/\$/g, '');
+}
+
+/**
+ * Rendert gemischten Inhalt (Text mit eingebetteten Formeln)
+ * @param {string} content - Gemischter Inhalt
+ * @returns {string} - HTML mit korrekt gerenderten Text- und Formel-Teilen
+ */
+function renderMixedContent(content) {
+    if (!content || typeof content !== 'string') return content;
+    
+    // Korrigiere deutsche Umlaute zuerst
+    let result = fixGermanUmlauts(content);
+    
+    // Finde mathematische Ausdrücke und ersetze sie mit Platzhaltern
+    const mathExpressions = [];
+    
+    // Pattern für mathematische Ausdrücke:
+    // - LaTeX-Befehle mit Argumenten: \frac{...}{...}, \sqrt{...}, etc.
+    // - Brüche, Summen, Integrale
+    // - Gleichungen und Ungleichungen mit Variablen
+    const mathPatterns = [
+        /\\[a-zA-Z]+(?:\{[^{}]*\}|\[[^\[\]]*\])*/g,  // LaTeX-Befehle
+        /[0-9]+\/[0-9]+/g,  // Brüche wie 1/4
+        /∑[^,.\s]*/g,  // Summen
+        /∫[^,.\s]*/g,  // Integrale
+        /[a-zA-Z]_\{?[a-zA-Z0-9]+\}?/g,  // Indizierte Variablen
+        /[a-zA-Z]\^[0-9a-zA-Z]/g,  // Potenzen
+        /≈\s*[0-9.,]+/g,  // Approximationen
+    ];
+    
+    // Sammle alle Math-Matches
+    mathPatterns.forEach(pattern => {
+        const matches = result.match(pattern);
+        if (matches) {
+            matches.forEach(match => {
+                if (!mathExpressions.includes(match)) {
+                    mathExpressions.push(match);
+                }
+            });
+        }
+    });
+    
+    // Sortiere nach Länge (längste zuerst) um Überlappungen zu vermeiden
+    mathExpressions.sort((a, b) => b.length - a.length);
+    
+    // Ersetze Math-Ausdrücke mit Platzhaltern
+    const placeholder = '\u0000MATH\u0000';
+    mathExpressions.forEach((expr, i) => {
+        const escaped = expr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        result = result.replace(new RegExp(escaped, 'g'), `${placeholder}${i}${placeholder}`);
+    });
+    
+    // Escape HTML im Text-Teil
+    result = result
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    // Ersetze Platzhalter mit gerenderten Math-Ausdrücken
+    mathExpressions.forEach((expr, i) => {
+        const sanitized = typeof sanitizeLatex === 'function' ? sanitizeLatex(expr) : expr;
+        result = result.replace(
+            `${placeholder}${i}${placeholder}`,
+            `<span class="inline-math">\\(${sanitized}\\)</span>`
+        );
+    });
+    
+    return result;
 }
 
 /**
@@ -556,6 +1117,28 @@ function wrapLatexInText(text) {
         return text;
     }
     
+    // === SCHRITT 1: Schütze Text-Annotationen vor LaTeX-Wrapping ===
+    // Muster wie [FEHLER: text], [Hinweis: text], [Anmerkung: text] etc.
+    const annotationMarker = '\u0001ANNOTATION\u0001';
+    const annotations = [];
+    let workingText = text;
+    
+    // Schütze Annotationen in eckigen Klammern mit Doppelpunkt
+    // z.B. [FEHLER: Vorzeichen falsch], [Hinweis: Beachte die Ableitung]
+    const annotationPattern = /\[[A-ZÄÖÜ][a-zA-ZäöüÄÖÜß]*:\s*[^\]]+\]/g;
+    workingText = workingText.replace(annotationPattern, (match) => {
+        annotations.push(match);
+        return `${annotationMarker}${annotations.length - 1}${annotationMarker}`;
+    });
+    
+    // Schütze Pfeil-Annotationen wie "← FEHLER: text"
+    const arrowAnnotationPattern = /←\s*[A-ZÄÖÜ][a-zA-ZäöüÄÖÜß]*:\s*[^\n]+/g;
+    workingText = workingText.replace(arrowAnnotationPattern, (match) => {
+        annotations.push(match);
+        return `${annotationMarker}${annotations.length - 1}${annotationMarker}`;
+    });
+    
+    // === SCHRITT 2: Finde LaTeX-Formeln ===
     // Einfacherer Ansatz: Finde zusammenhängende mathematische Ausdrücke
     // die LaTeX-Befehle enthalten
     // Pattern erkennt: Zahlen, Variablen, Operatoren, und LaTeX-Befehle als zusammenhängende Formel
@@ -567,14 +1150,22 @@ function wrapLatexInText(text) {
     // - Optionale folgende mathematische Ausdrücke (Zahlen, Operatoren, weitere LaTeX)
     const latexFormulaPattern = /(?:[0-9a-zA-Z()\[\]]*\s*)?\\[a-zA-Z]+(?:\{[^{}]*\}|\[[^\[\]]*\])*(?:\s*[=+\-*/^_()0-9a-zA-Z{}]*(?:\\[a-zA-Z]+(?:\{[^{}]*\}|\[[^\[\]]*\])*)?)*/g;
     
-    let result = text;
-    const matches = text.match(latexFormulaPattern);
+    let result = workingText;
+    const matches = workingText.match(latexFormulaPattern);
     
     if (matches) {
         // Dedupliziere und sortiere nach Länge (längste zuerst)
         const uniqueMatches = [...new Set(matches)]
             .map(m => m.trim())
             .filter(m => m.length > 0 && m.includes('\\'))
+            // Filtere deutsche Wörter und Text-Annotationen heraus
+            .filter(m => {
+                // Überspringe wenn der Match nur aus Buchstaben besteht (keine echte Formel)
+                if (/^[a-zA-ZäöüÄÖÜß]+$/.test(m.replace(/\\/g, ''))) return false;
+                // Überspringe Annotationen
+                if (m.includes(annotationMarker)) return false;
+                return true;
+            })
             .sort((a, b) => b.length - a.length);
         
         // Verwende einen Marker um bereits ersetzte Bereiche zu markieren
@@ -600,6 +1191,11 @@ function wrapLatexInText(text) {
         
         // Entferne die Marker
         result = result.replace(new RegExp(marker, 'g'), '');
+    }
+    
+    // === SCHRITT 3: Stelle geschützte Annotationen wieder her ===
+    for (let i = 0; i < annotations.length; i++) {
+        result = result.replace(`${annotationMarker}${i}${annotationMarker}`, annotations[i]);
     }
     
     return result;
@@ -826,6 +1422,107 @@ function extractVariableAssignment(latex) {
 }
 
 /**
+ * Pre-Validierung von Lösungsschritten BEVOR die KI aufgerufen wird.
+ * Identifiziert verdächtige Stellen durch algorithmische Prüfung.
+ * Diese Info wird dann dem Prompt mitgegeben, damit die KI diese Stellen extra prüft.
+ * 
+ * @param {string} solutionText - Rohe Lösung des Schülers
+ * @returns {Array} - Array von verdächtigen Stellen: [{lineNumber, reason}]
+ */
+function preValidateSolutionSteps(solutionText) {
+    if (!solutionText || typeof solutionText !== 'string') return [];
+    
+    const suspiciousSteps = [];
+    const lines = solutionText.split('\n').filter(l => l.trim());
+    
+    // Versuche mathematische Ausdrücke zu validieren
+    let previousExpr = null;
+    let previousLine = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Versuche den mathematischen Ausdruck zu extrahieren
+        const currentExpr = latexToMathExpression(line);
+        
+        if (currentExpr && previousExpr) {
+            // Validiere Transformation vom vorherigen zum aktuellen Schritt
+            const validation = validateStepTransformation(previousLine, line);
+            
+            if (validation.isValid === false) {
+                suspiciousSteps.push({
+                    lineNumber: i + 1,
+                    previousLine: i,
+                    reason: validation.reason || 'Möglicherweise fehlerhafte Umformung',
+                    content: line.substring(0, 50) + (line.length > 50 ? '...' : '')
+                });
+            }
+        }
+        
+        // Einfache Checks für häufige Fehler
+        
+        // 1. Prüfe auf Vorzeichenfehler in Klammern: -(a+b) sollte -a-b werden
+        if (/\-\s*\([^)]+\)/.test(line)) {
+            // Prüfe ob danach ein + statt - kommt (häufiger Fehler)
+            const match = line.match(/\-\s*\(([^)]+)\)\s*=?\s*(.+)?/);
+            if (match && match[2]) {
+                const afterEquals = match[2];
+                const insideParens = match[1];
+                // Wenn innerhalb ein + ist und danach auch ein + folgt -> verdächtig
+                if (insideParens.includes('+') && afterEquals.includes('+')) {
+                    suspiciousSteps.push({
+                        lineNumber: i + 1,
+                        reason: 'Vorzeichen bei Klammerauflösung prüfen',
+                        content: line.substring(0, 50)
+                    });
+                }
+            }
+        }
+        
+        // 2. Prüfe auf Quadrat-Fehler: (-a)² ≠ -a²
+        if (/\(-?\d+\)\s*[\^²]/.test(line) || /\(-?[a-z]\)\s*[\^²]/.test(line)) {
+            // Nachfolgende Zeile prüfen ob Vorzeichen korrekt
+            if (i + 1 < lines.length) {
+                const nextLine = lines[i + 1];
+                // Wenn Quadrat einer negativen Zahl und Ergebnis negativ -> Fehler
+                const negSquareMatch = line.match(/\((-\d+)\)\s*[\^²2]/);
+                if (negSquareMatch) {
+                    const squared = negSquareMatch[1];
+                    // Prüfe ob das Ergebnis negativ ist (wäre falsch)
+                    if (nextLine.includes(squared + '²') || nextLine.includes('-' + Math.abs(parseInt(squared)) * Math.abs(parseInt(squared)))) {
+                        suspiciousSteps.push({
+                            lineNumber: i + 1,
+                            reason: 'Quadrat einer negativen Zahl ergibt positives Ergebnis',
+                            content: line.substring(0, 50)
+                        });
+                    }
+                }
+            }
+        }
+        
+        // 3. Prüfe Division durch potenzielle Null
+        if (/\/\s*0\b/.test(line) || /:\s*0\b/.test(line)) {
+            suspiciousSteps.push({
+                lineNumber: i + 1,
+                reason: 'Division durch Null!',
+                content: line.substring(0, 50)
+            });
+        }
+        
+        previousExpr = currentExpr;
+        previousLine = line;
+    }
+    
+    // Entferne Duplikate (gleiche Zeile mehrfach markiert)
+    const uniqueSuspicious = suspiciousSteps.filter((item, index, self) =>
+        index === self.findIndex(t => t.lineNumber === item.lineNumber)
+    );
+    
+    return uniqueSuspicious;
+}
+
+/**
  * Extrahiert Gleichungen mit zwei Variablen aus den Schritten
  * @param {Array} steps - Schritte der Analyse
  * @returns {Array} - Array von {left, right, originalLatex}
@@ -1034,6 +1731,55 @@ function validateErrorMarkings(analysis) {
     };
 }
 
+/**
+ * Korrigiert logisch ungültige Folgefehler-Zuweisungen
+ * Ein Folgefehler kann nur existieren, wenn VORHER bereits ein echter Fehler (logic/calc) aufgetreten ist.
+ * Der erste Fehler in einer Lösung kann NIEMALS ein Folgefehler sein.
+ * @param {Object} analysis - Die Analyse mit steps
+ * @returns {Object} - Die korrigierte Analyse
+ */
+function fixFollowupErrors(analysis) {
+    if (!analysis || !analysis.steps || analysis.steps.length === 0) {
+        return analysis;
+    }
+    
+    const correctedSteps = [...analysis.steps];
+    let correctionsMade = 0;
+    let foundRealError = false;
+    
+    for (let i = 0; i < correctedSteps.length; i++) {
+        const step = correctedSteps[i];
+        
+        if (step.errorType === 'followup') {
+            if (!foundRealError) {
+                // Erster "Folgefehler" ohne vorherigen echten Fehler -> zu calc oder logic ändern
+                console.log(`[FollowupFix] Step ${step.index || i + 1} marked as followup but no previous error found. Changing to calc.`);
+                correctedSteps[i] = {
+                    ...step,
+                    errorType: 'calc',
+                    _followupCorrected: true
+                };
+                correctionsMade++;
+                foundRealError = true; // Jetzt haben wir einen echten Fehler
+            }
+            // Sonst: followup ist korrekt, da vorher ein echter Fehler war
+        } else if (step.errorType === 'logic' || step.errorType === 'calc') {
+            foundRealError = true;
+        }
+    }
+    
+    if (correctionsMade > 0) {
+        console.log(`[FollowupFix] Corrected ${correctionsMade} invalid followup error(s)`);
+    }
+    
+    return {
+        ...analysis,
+        steps: correctedSteps,
+        _followupFixApplied: true,
+        _followupCorrections: correctionsMade
+    };
+}
+
 // Exportiere für globalen Zugriff
 if (typeof window !== 'undefined') {
     window.LatexSanitizer = {
@@ -1051,6 +1797,7 @@ if (typeof window !== 'undefined') {
         areExpressionsEquivalent,
         validateStepTransformation,
         validateErrorMarkings,
+        fixFollowupErrors,
         extractVariableAssignment,
         extractOriginalEquations,
         validateBackSubstitution
@@ -1123,7 +1870,7 @@ class TestManager {
     
     /**
      * Führt einen einzelnen Test mit zufälliger Aufgabe aus
-     * Liest die Lösungsart aus dem UI-Dropdown
+     * Verwendet den normalen Workflow (displayResults → submitSolution → displayStructuredFeedback)
      * @returns {Promise<Object>} Test-Ergebnis
      */
     async runSingleTest() {
@@ -1137,10 +1884,7 @@ class TestManager {
             return null;
         }
         
-        if (!this.tutor.apiKey) {
-            this.tutor.showNotification('API-Schlüssel fehlt. Bitte im Profil konfigurieren.', 'warning');
-            return null;
-        }
+        // API-Key wird über Backend-Proxy verwaltet - keine Prüfung nötig
         
         // Lösungsart aus UI-Dropdown lesen
         const solutionTypeSelect = document.getElementById('test-solution-type');
@@ -1151,73 +1895,76 @@ class TestManager {
             // 'random' bleibt null
         }
         
+        // Schwierigkeitsgrad-Filter lesen (falls vorhanden)
+        const difficultyFilter = document.getElementById('test-difficulty-filter');
+        let selectedDifficulty = difficultyFilter?.value || 'all';
+        
         this.isRunning = true;
-        this.tutor.isTestMode = true;  // Test-Modus aktivieren
-        this.tutor.showLoading(true);
         
         try {
-            // Zufällige Aufgabe und Lösung wählen
-            const task = window.TestData.getRandomTestTask();
+            // Aufgabe basierend auf Schwierigkeitsgrad wählen
+            let task;
+            if (selectedDifficulty === 'all') {
+                task = window.TestData.getRandomTestTask();
+            } else {
+                task = window.TestData.getRandomTestTaskByDifficulty(selectedDifficulty);
+                if (!task) {
+                    this.tutor.showNotification(`Keine Aufgaben für Schwierigkeit "${selectedDifficulty}" gefunden.`, 'warning');
+                    return null;
+                }
+            }
+            
             const solution = window.TestData.getRandomSolution(task, forceIncorrect);
             
-            console.log('[TestManager] Starte Test:', {
+            console.log('[TestManager] Starte Test mit normalem Workflow:', {
                 taskId: task.id,
+                topic: task.topic,
+                difficulty: task.difficulty,
                 isCorrect: solution.isCorrect,
                 expectedErrors: solution.expectedErrors,
                 solutionType: forceIncorrect === true ? 'fehlerhaft' : forceIncorrect === false ? 'korrekt' : 'zufällig'
             });
             
-            // Aufgabe in den Tutor laden
-            this.tutor.currentTask = task.task;
-            this.tutor.solutionState = this.tutor.getDefaultSolutionState();
-            this.tutor.stepCorrections = {};
+            // 1. Aufgabe in der normalen Ansicht anzeigen (wie bei generierter Aufgabe)
+            // Formatiere die Aufgabe mit Test-Badge
+            const taskWithBadge = `**[TEST: ${task.id}]** (${this._translateDifficulty(task.difficulty)})\n\n${task.task}`;
+            this.tutor.displayResults(taskWithBadge, true);
             
-            // Fehleranalyse durchführen
-            const prompts = this.tutor.buildErrorAnalysisPrompt({
-                userSolution: solution.solution,
-                drawingInfo: '',
-                hasDrawings: false,
-                attemptNumber: 1
-            });
-            
-            const analysis = await this.tutor.callErrorAnalysisAPI(prompts);
-            const hasErrors = analysis.steps && analysis.steps.some(s => s.errorType && s.errorType !== 'none');
-            const success = !hasErrors;
-
-            // State für Hint-/Feedback-Nutzung im Test-Modus setzen
-            this.tutor.solutionState = {
-                lastUserSolution: solution.solution,
-                lastCanvasImages: [],
-                lastCheckResponse: analysis,
-                lastAnalysis: analysis,
-                lastWasCorrect: success,
-                attemptCount: 1,
-                previousAnalyses: [],
-                hilfestellungEligible: !success && !!solution.solution,
-                hilfestellungProvided: false,
-                correctedProvided: false,
-                canRequestOptimal: success,
-                optimalDelivered: false,
-                hilfestellungContent: '',
-                correctedContent: '',
-                optimalContent: '',
-                hintState: {
-                    prepared: analysis.hints || { level1: [], level2: [] },
-                    unlockedLevel: 0,
-                    popupOpen: false
-                }
+            // 2. Task-Kontext setzen für korrektes Tracking
+            this.tutor.currentTaskContext = {
+                topic: task.topic,
+                subtopic: null,
+                taskType: 'berechnung',
+                difficulty: task.difficulty,
+                origin: 'test',
+                testTaskId: task.id
             };
+            
+            // 3. Lösung automatisch ins Eingabefeld eintragen
+            // Kurze Verzögerung um sicherzustellen, dass DOM bereit ist
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const solutionInput = document.getElementById('solution-input');
+            if (solutionInput) {
+                solutionInput.value = solution.solution;
+                // Visual feedback
+                solutionInput.classList.add('test-auto-filled');
+                setTimeout(() => solutionInput.classList.remove('test-auto-filled'), 1000);
+            }
+            
+            // 4. Info-Banner anzeigen
+            this._showTestInfoBanner(task, solution);
+            
+            // 5. Lösung automatisch einreichen (normaler Workflow)
+            await this.tutor.submitSolution();
             
             // Ergebnis zusammenstellen
             const result = {
                 task: task,
                 solution: solution,
-                analysis: analysis,
+                analysis: this.tutor.solutionState.lastAnalysis,
                 timestamp: new Date().toISOString()
             };
-            
-            // KI-Analyse direkt anzeigen (ohne Hook-Validierung)
-            this.displayAnalysisResult(task, solution, analysis);
             
             return result;
             
@@ -1227,8 +1974,61 @@ class TestManager {
             return { error: error.message };
         } finally {
             this.isRunning = false;
-            this.tutor.showLoading(false);
         }
+    }
+    
+    /**
+     * Zeigt ein Info-Banner über dem Feedback an mit Test-Details
+     */
+    _showTestInfoBanner(task, solution) {
+        const feedbackArea = document.getElementById('feedback-area');
+        if (!feedbackArea) return;
+        
+        // Entferne eventuell vorhandenes Banner
+        const existingBanner = document.querySelector('.test-info-banner');
+        if (existingBanner) existingBanner.remove();
+        
+        const banner = document.createElement('div');
+        banner.className = 'test-info-banner';
+        banner.innerHTML = `
+            <div class="test-info-header">
+                <i class="fas fa-flask"></i>
+                <span>TEST-MODUS</span>
+            </div>
+            <div class="test-info-details">
+                <span><strong>Aufgabe:</strong> ${task.id}</span>
+                <span><strong>Thema:</strong> ${task.topic}</span>
+                <span><strong>Schwierigkeit:</strong> ${this._translateDifficulty(task.difficulty)}</span>
+                <span><strong>Lösungsart:</strong> ${solution.isCorrect ? 
+                    '<span class="test-correct">Korrekte Lösung</span>' : 
+                    '<span class="test-incorrect">Fehlerhafte Lösung</span>'}</span>
+            </div>
+            ${!solution.isCorrect && solution.expectedErrors?.length > 0 ? `
+            <div class="test-expected-errors">
+                <strong>Erwartete Fehler:</strong>
+                ${solution.expectedErrors.map(e => 
+                    `<span class="expected-error">Schritt ${e.step}: ${e.type} - ${e.description}</span>`
+                ).join('')}
+            </div>
+            ` : ''}
+        `;
+        
+        // Banner vor dem Feedback-Bereich einfügen
+        feedbackArea.parentNode.insertBefore(banner, feedbackArea);
+    }
+    
+    /**
+     * Übersetzt Schwierigkeitsgrad in deutsche Bezeichnung
+     */
+    _translateDifficulty(difficulty) {
+        const translations = {
+            'easy': 'Leicht',
+            'medium': 'Mittel',
+            'hard': 'Schwer',
+            'expert': 'Experte',
+            'olympiad': 'Olympiade'
+        };
+        return translations[difficulty] || difficulty;
     }
     
     /**
@@ -1246,10 +2046,7 @@ class TestManager {
             return null;
         }
         
-        if (!this.tutor.apiKey) {
-            this.tutor.showNotification('API-Schlüssel fehlt.', 'warning');
-            return null;
-        }
+        // API-Key wird über Backend-Proxy verwaltet
         
         this.isRunning = true;
         this.batchResults = [];
@@ -1534,9 +2331,9 @@ class TestManager {
             
         // Feedback
         if (analysis.feedback) {
-            // LaTeX im Feedback-Text mit Delimitern umgeben für MathJax-Rendering
-            const formattedFeedback = typeof wrapLatexInText === 'function' 
-                ? wrapLatexInText(analysis.feedback.summarySentence || 'Kein Feedback')
+            // Nur Umlaute korrigieren, kein LaTeX-Wrapping für Feedback-Text
+            const formattedFeedback = typeof fixGermanUmlauts === 'function' 
+                ? fixGermanUmlauts(analysis.feedback.summarySentence || 'Kein Feedback')
                 : (analysis.feedback.summarySentence || 'Kein Feedback');
             html += `
                 <div class="test-feedback">
@@ -1549,8 +2346,8 @@ class TestManager {
         // Detailed Feedback anzeigen (Level 3)
         if (analysis.detailedFeedback) {
             const df = analysis.detailedFeedback;
-            // Helper-Funktion um LaTeX in Text zu wrappen
-            const formatText = (text) => typeof wrapLatexInText === 'function' ? wrapLatexInText(text) : text;
+            // Nur Umlaute korrigieren, kein LaTeX-Wrapping für Feedback-Text
+            const formatText = (text) => typeof fixGermanUmlauts === 'function' ? fixGermanUmlauts(text) : text;
             
             html += `<div class="test-detailed-feedback">`;
             
@@ -1764,15 +2561,20 @@ class TestManager {
 
 class MathTutorAI {
     constructor() {
+        console.log('[MathTutorAI] Constructor called');
+        console.log('[MathTutorAI] window.MATH_TOPICS:', typeof window.MATH_TOPICS !== 'undefined' ? Object.keys(window.MATH_TOPICS).length + ' topics' : 'undefined');
+        
         // Auth Service (deaktiviert im Guest-Modus)
         // GUEST-MODUS: AuthService nur erstellen wenn nicht im Guest-Modus
         this.authService = window.authService || null; // null im Guest-Modus
         this.currentUser = window.currentUser || null;
         this.userId = window.currentUser?.userId || null;
         
-        // Legacy API Keys (für Backward-Compatibility)
-        this.apiKey = localStorage.getItem('openai_api_key') || '';
+        // API-Konfiguration - nutzt Backend-Proxy (API-Key liegt auf dem Server)
+        this.useProxy = true; // Immer Proxy verwenden
+        this.apiKey = 'proxy'; // Marker für Proxy-Nutzung
         this.apiProvider = localStorage.getItem('api_provider') || 'openai';
+        this.proxyUrl = '/api/ai/chat.php'; // Backend-Proxy URL
         this.userProfile = this.loadUserProfile();
         this.uploadedImages = [];
         this.abiTasks = [];
@@ -1780,6 +2582,16 @@ class MathTutorAI {
         this.solutionState = this.getDefaultSolutionState();
         this.stepCorrections = {};  // User-Korrekturen für einzelne Schritte
         this.isTestMode = false;    // Flag für Test-Modus (wird vom TestManager gesetzt)
+        
+        // Kontext für Follow-up Fragen im "Aufgabe Erklären" Tab
+        this.explanationContext = {
+            originalQuestion: null,
+            originalResponse: null,
+            hasContext: false
+        };
+        
+        // Session-Statistiken für Sidebar-Widgets
+        this.sessionStats = this._loadSessionStats();
         const origin = window.location.origin && window.location.origin.startsWith('http') ? window.location.origin : 'http://localhost:4000';
         this.backendApiBase = (window.APP_CONFIG && window.APP_CONFIG.BACKEND_URL) || origin.replace(/\/$/, '');
         
@@ -1883,6 +2695,9 @@ class MathTutorAI {
         this.setupAbiGenerator();
         this.setupAnchorNavigation();
         // API-Konfiguration wird jetzt im Profil-Tab verwaltet
+        
+        // Sidebar-Widgets initialisieren
+        this.updateAllSidebarWidgets();
     }
 
     /**
@@ -1940,24 +2755,36 @@ class MathTutorAI {
 
     setupEventListeners() {
         // Text Input Analysis
-        document.getElementById('analyze-btn').addEventListener('click', () => {
-            this.analyzeTextInput();
-        });
+        const analyzeBtn = document.getElementById('analyze-btn');
+        if (analyzeBtn) {
+            analyzeBtn.addEventListener('click', () => {
+                this.analyzeTextInput();
+            });
+        }
 
         // Clear Button
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            this.clearTextInput();
-        });
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.clearTextInput();
+            });
+        }
 
         // Image Analysis
-        document.getElementById('analyze-image-btn').addEventListener('click', () => {
-            this.analyzeImageInput();
-        });
+        const analyzeImageBtn = document.getElementById('analyze-image-btn');
+        if (analyzeImageBtn) {
+            analyzeImageBtn.addEventListener('click', () => {
+                this.analyzeImageInput();
+            });
+        }
 
         // Generate Task Button
-        document.getElementById('generate-btn').addEventListener('click', () => {
-            this.generateTask();
-        });
+        const generateBtn = document.getElementById('generate-btn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', () => {
+                this.generateTask();
+            });
+        }
         
         // Random Generate Button
         const randomGenBtn = document.getElementById('random-generate-btn');
@@ -1993,37 +2820,58 @@ class MathTutorAI {
             });
         }
 
-        // API Configuration
-        document.getElementById('save-api-config').addEventListener('click', () => {
-            this.saveApiConfiguration();
-        });
+        // API Configuration (optional elements - may not exist)
+        const saveApiConfigBtn = document.getElementById('save-api-config');
+        if (saveApiConfigBtn) {
+            saveApiConfigBtn.addEventListener('click', () => {
+                this.saveApiConfiguration();
+            });
+        }
 
-        document.getElementById('cancel-api-config').addEventListener('click', () => {
-            this.closeApiModal();
-        });
+        const cancelApiConfigBtn = document.getElementById('cancel-api-config');
+        if (cancelApiConfigBtn) {
+            cancelApiConfigBtn.addEventListener('click', () => {
+                this.closeApiModal();
+            });
+        }
 
-        document.getElementById('close-modal').addEventListener('click', () => {
-            this.closeApiModal();
-        });
+        const closeModalBtn = document.getElementById('close-modal');
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', () => {
+                this.closeApiModal();
+            });
+        }
 
         // Results
-        document.getElementById('close-results').addEventListener('click', () => {
-            this.closeResults();
-        });
+        const closeResultsBtn = document.getElementById('close-results');
+        if (closeResultsBtn) {
+            closeResultsBtn.addEventListener('click', () => {
+                this.closeResults();
+            });
+        }
 
         // Profile Management
-        document.getElementById('save-profile').addEventListener('click', () => {
-            this.saveUserProfile();
-        });
+        const saveProfileBtn = document.getElementById('save-profile');
+        if (saveProfileBtn) {
+            saveProfileBtn.addEventListener('click', () => {
+                this.saveUserProfile();
+            });
+        }
 
-        document.getElementById('reset-profile').addEventListener('click', () => {
-            this.resetUserProfile();
-        });
+        const resetProfileBtn = document.getElementById('reset-profile');
+        if (resetProfileBtn) {
+            resetProfileBtn.addEventListener('click', () => {
+                this.resetUserProfile();
+            });
+        }
 
-        // API Key Toggle in Profile
-        document.getElementById('toggle-api-key').addEventListener('click', () => {
-            this.toggleApiKeyVisibility();
-        });
+        // API Key Toggle in Profile (optional element)
+        const toggleApiKeyBtn = document.getElementById('toggle-api-key');
+        if (toggleApiKeyBtn) {
+            toggleApiKeyBtn.addEventListener('click', () => {
+                this.toggleApiKeyVisibility();
+            });
+        }
 
         // Strength/Weakness Dashboard Refresh
         const swRefreshBtn = document.getElementById('sw-refresh');
@@ -2034,18 +2882,24 @@ class MathTutorAI {
         }
 
         // Enter key for text input
-        document.getElementById('math-input').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                this.analyzeTextInput();
-            }
-        });
+        const mathInput = document.getElementById('math-input');
+        if (mathInput) {
+            mathInput.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    this.analyzeTextInput();
+                }
+            });
+        }
 
         // Enter key for image description
-        document.getElementById('image-description').addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter') {
-                this.analyzeImageInput();
-            }
-        });
+        const imageDescription = document.getElementById('image-description');
+        if (imageDescription) {
+            imageDescription.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    this.analyzeImageInput();
+                }
+            });
+        }
     }
 
     setupTabSwitching() {
@@ -2090,6 +2944,10 @@ class MathTutorAI {
 
             // Lade Profil neu, wenn Profil-Tab geöffnet wird
             if (targetTab === 'user-profile' && this.userProfile) {
+                // Stelle sicher, dass currentUser aktuell ist
+                if (window.currentUser && !this.currentUser) {
+                    this.currentUser = window.currentUser;
+                }
                 this.populateProfileForm(this.userProfile);
             }
             
@@ -2112,6 +2970,16 @@ class MathTutorAI {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
                 const targetSection = item.getAttribute('data-section');
+                switchToTab(targetSection);
+            });
+        });
+
+        // Dashboard action cards click handlers
+        const actionCards = document.querySelectorAll('.action-card[data-section]');
+        actionCards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetSection = card.getAttribute('data-section');
                 switchToTab(targetSection);
             });
         });
@@ -2469,6 +3337,266 @@ class MathTutorAI {
         this.stepCorrections = {};  // Reset step corrections
         this.updateSolutionActionButtons();
     }
+    
+    // ==================== SESSION STATISTIKEN ====================
+    
+    /**
+     * Lädt Session-Statistiken aus localStorage (tagesbasiert)
+     */
+    _loadSessionStats() {
+        const today = new Date().toDateString();
+        const stored = localStorage.getItem('session_stats');
+        
+        if (stored) {
+            try {
+                const stats = JSON.parse(stored);
+                // Prüfe ob die Statistiken von heute sind
+                if (stats.date === today) {
+                    return stats;
+                }
+            } catch (e) {
+                console.warn('[SessionStats] Failed to parse stored stats');
+            }
+        }
+        
+        // Neue Statistiken für heute
+        return this._getDefaultSessionStats(today);
+    }
+    
+    /**
+     * Gibt Standard-Session-Statistiken zurück
+     */
+    _getDefaultSessionStats(date = new Date().toDateString()) {
+        return {
+            date: date,
+            tasksGenerated: 0,
+            tasksSolved: 0,
+            dailyGoal: 5,
+            errors: {
+                logic: 0,
+                calc: 0,
+                followup: 0,
+                formal: 0
+            },
+            currentTask: null
+        };
+    }
+    
+    /**
+     * Speichert Session-Statistiken in localStorage
+     */
+    _saveSessionStats() {
+        try {
+            localStorage.setItem('session_stats', JSON.stringify(this.sessionStats));
+        } catch (e) {
+            console.warn('[SessionStats] Failed to save stats');
+        }
+    }
+    
+    /**
+     * Aktualisiert das "Aktuelle Aufgabe" Widget
+     */
+    updateCurrentTaskWidget() {
+        const widget = document.getElementById('current-task-widget');
+        if (!widget) return;
+        
+        const titleEl = widget.querySelector('.task-title');
+        if (!titleEl) return;
+        
+        if (this.currentTask && this.currentTaskContext) {
+            // Kompakte Darstellung: Thema + Typ
+            const topicName = window.MATH_TOPICS?.[this.currentTaskContext.topic]?.name || this.currentTaskContext.topic || 'Aufgabe';
+            const taskTypeName = window.TASK_TYPES?.[this.currentTaskContext.taskType]?.name || '';
+            const difficulty = window.DIFFICULTY_LEVELS?.[this.currentTaskContext.difficulty]?.name || '';
+            
+            let displayText = topicName;
+            if (taskTypeName) displayText += ` (${taskTypeName})`;
+            if (difficulty) displayText = `${difficulty}: ${displayText}`;
+            
+            // Kürze auf max 40 Zeichen
+            if (displayText.length > 40) {
+                displayText = displayText.substring(0, 37) + '...';
+            }
+            
+            titleEl.textContent = displayText;
+            titleEl.title = this.currentTask.substring(0, 200); // Tooltip mit mehr Details
+            widget.classList.add('has-task');
+            
+            // Session-Stats aktualisieren
+            this.sessionStats.currentTask = {
+                topic: this.currentTaskContext.topic,
+                taskType: this.currentTaskContext.taskType,
+                difficulty: this.currentTaskContext.difficulty,
+                timestamp: Date.now()
+            };
+            this._saveSessionStats();
+        } else {
+            titleEl.textContent = 'Keine Aufgabe aktiv';
+            titleEl.title = '';
+            widget.classList.remove('has-task');
+            this.sessionStats.currentTask = null;
+            this._saveSessionStats();
+        }
+    }
+    
+    /**
+     * Aktualisiert das Fortschritts-Widget
+     */
+    updateProgressWidget() {
+        const countEl = document.getElementById('progress-count');
+        const fillEl = document.getElementById('progress-fill');
+        
+        if (!countEl || !fillEl) return;
+        
+        const solved = this.sessionStats.tasksSolved;
+        const goal = this.sessionStats.dailyGoal;
+        const percentage = Math.min((solved / goal) * 100, 100);
+        
+        countEl.textContent = `${solved}/${goal}`;
+        fillEl.style.width = `${percentage}%`;
+        
+        // Farbe ändern bei Erreichen des Ziels
+        if (solved >= goal) {
+            fillEl.classList.add('completed');
+        } else {
+            fillEl.classList.remove('completed');
+        }
+    }
+    
+    /**
+     * Aktualisiert die Fehler-Statistiken in der Sidebar
+     */
+    updateErrorStatsWidget() {
+        const stats = this.sessionStats.errors;
+        
+        const elements = {
+            logic: document.getElementById('stat-logic'),
+            calc: document.getElementById('stat-calc'),
+            followup: document.getElementById('stat-followup'),
+            formal: document.getElementById('stat-formal')
+        };
+        
+        for (const [type, el] of Object.entries(elements)) {
+            if (el) {
+                el.textContent = stats[type] || 0;
+                // Animation bei Änderung
+                if (stats[type] > 0) {
+                    el.classList.add('has-errors');
+                }
+            }
+        }
+    }
+    
+    /**
+     * Registriert Fehler aus einer Analyse
+     * @param {Object} analysis - Die Analyse-Antwort
+     */
+    recordErrorsFromAnalysis(analysis) {
+        if (!analysis) return;
+        
+        // Für normale Berechnungen/Sachaufgaben: steps
+        if (analysis.steps && Array.isArray(analysis.steps)) {
+            analysis.steps.forEach(step => {
+                if (step.errorType && step.errorType !== 'none') {
+                    if (this.sessionStats.errors[step.errorType] !== undefined) {
+                        this.sessionStats.errors[step.errorType]++;
+                    }
+                }
+            });
+        }
+        
+        // Für Theorie-Aufgaben: subTasks (Fehler anders zählen)
+        if (analysis.subTasks && Array.isArray(analysis.subTasks)) {
+            analysis.subTasks.forEach(task => {
+                if (task.correctness === 'incorrect') {
+                    // Bei Theorie als "Logik"-Fehler zählen
+                    this.sessionStats.errors.logic++;
+                }
+            });
+        }
+        
+        this._saveSessionStats();
+        this.updateErrorStatsWidget();
+    }
+    
+    /**
+     * Registriert eine erfolgreich gelöste Aufgabe
+     */
+    recordTaskSolved() {
+        this.sessionStats.tasksSolved++;
+        this._saveSessionStats();
+        this.updateProgressWidget();
+        
+        // Empfehlungen aktualisieren
+        this.updateRecommendationsWidget();
+    }
+    
+    /**
+     * Registriert eine neu generierte Aufgabe
+     */
+    recordTaskGenerated() {
+        this.sessionStats.tasksGenerated++;
+        this._saveSessionStats();
+        this.updateCurrentTaskWidget();
+    }
+    
+    /**
+     * Aktualisiert das Empfehlungs-Widget
+     */
+    updateRecommendationsWidget() {
+        const widget = document.getElementById('recommendations-widget');
+        if (!widget) return;
+        
+        const container = widget.querySelector('.recommendation-item');
+        if (!container) return;
+        
+        const solved = this.sessionStats.tasksSolved;
+        const goal = this.sessionStats.dailyGoal;
+        const errors = this.sessionStats.errors;
+        const totalErrors = errors.logic + errors.calc + errors.followup + errors.formal;
+        
+        let icon = 'lightbulb';
+        let text = '';
+        
+        if (solved === 0) {
+            text = 'Starte mit einer Übungsaufgabe';
+            icon = 'play-circle';
+        } else if (solved >= goal) {
+            text = 'Tagesziel erreicht! Weiter so!';
+            icon = 'trophy';
+        } else if (errors.logic > errors.calc && errors.logic >= 3) {
+            text = 'Fokus auf Lösungsstrategien';
+            icon = 'brain';
+        } else if (errors.calc > errors.logic && errors.calc >= 3) {
+            text = 'Achte auf die Rechenschritte';
+            icon = 'calculator';
+        } else if (totalErrors > 5) {
+            text = 'Wiederhole die Grundlagen';
+            icon = 'book';
+        } else if (solved > 0 && solved < goal) {
+            const remaining = goal - solved;
+            text = `Noch ${remaining} ${remaining === 1 ? 'Aufgabe' : 'Aufgaben'} bis zum Ziel`;
+            icon = 'flag-checkered';
+        } else {
+            text = 'Weiter üben!';
+            icon = 'dumbbell';
+        }
+        
+        container.innerHTML = `
+            <i class="fas fa-${icon}"></i>
+            <span>${text}</span>
+        `;
+    }
+    
+    /**
+     * Aktualisiert alle Sidebar-Widgets
+     */
+    updateAllSidebarWidgets() {
+        this.updateCurrentTaskWidget();
+        this.updateProgressWidget();
+        this.updateErrorStatsWidget();
+        this.updateRecommendationsWidget();
+    }
 
     getSolutionActionNote() {
         const unlockedLevel = this.solutionState.hintState?.unlockedLevel || 0;
@@ -2495,38 +3623,56 @@ class MathTutorAI {
         const optimalBtn = document.getElementById('request-optimal');
         const noteElement = document.getElementById('solution-action-note');
 
-        if (hintBtn) {
-            const unlockedLevel = this.solutionState.hintState?.unlockedLevel || 0;
-            const hasAnalysis = !!this.solutionState.lastAnalysis;
-            const canShow = hasAnalysis && this.solutionState.lastWasCorrect === false;
-            hintBtn.disabled = !canShow;
+        const unlockedLevel = this.solutionState.hintState?.unlockedLevel || 0;
+        const hasAnalysis = !!this.solutionState.lastAnalysis;
+        const canShow = hasAnalysis && this.solutionState.lastWasCorrect === false;
+        const canOptimal = this.solutionState.canRequestOptimal && !this.solutionState.optimalDelivered;
 
-            let label = 'Hints anzeigen';
-            let icon = 'fa-lightbulb';
-            if (unlockedLevel === 0) {
-                label = 'Hint Stufe 1';
-                icon = 'fa-lightbulb';
-            } else if (unlockedLevel === 1) {
-                label = 'Hint Stufe 2';
-                icon = 'fa-lightbulb';
-            } else if (unlockedLevel === 2) {
-                label = 'Lösung anzeigen';
-                icon = 'fa-eye';
-            } else {
-                label = 'Lösung ansehen';
-                icon = 'fa-check-circle';
-                hintBtn.disabled = false; // Immer verfügbar um Popup erneut zu öffnen
-            }
-            hintBtn.innerHTML = `<i class="fas ${icon}"></i> ${label}`;
+        let hintLabel = 'Hints anzeigen';
+        let hintIcon = 'fa-lightbulb';
+        let hintDisabled = !canShow;
+        
+        if (unlockedLevel === 0) {
+            hintLabel = 'Hint Stufe 1';
+            hintIcon = 'fa-lightbulb';
+        } else if (unlockedLevel === 1) {
+            hintLabel = 'Hint Stufe 2';
+            hintIcon = 'fa-lightbulb';
+        } else if (unlockedLevel === 2) {
+            hintLabel = 'Lösung anzeigen';
+            hintIcon = 'fa-eye';
+        } else {
+            hintLabel = 'Lösung ansehen';
+            hintIcon = 'fa-check-circle';
+            hintDisabled = false; // Immer verfügbar um Popup erneut zu öffnen
+        }
+
+        // Original-Button aktualisieren
+        if (hintBtn) {
+            hintBtn.disabled = hintDisabled;
+            hintBtn.innerHTML = `<i class="fas ${hintIcon}"></i> ${hintLabel}`;
         }
 
         if (optimalBtn) {
-            const canOptimal = this.solutionState.canRequestOptimal && !this.solutionState.optimalDelivered;
             optimalBtn.disabled = !canOptimal;
         }
 
         if (noteElement) {
             noteElement.textContent = this.getSolutionActionNote();
+        }
+        
+        // Fixierte Bar aktualisieren (falls vorhanden) - über data-Attribute
+        if (this.fixedActionsBar) {
+            const fixedHintBtn = this.fixedActionsBar.querySelector('[data-action="hint"]');
+            const fixedOptimalBtn = this.fixedActionsBar.querySelector('[data-action="optimal"]');
+            
+            if (fixedHintBtn) {
+                fixedHintBtn.disabled = hintDisabled;
+                fixedHintBtn.innerHTML = `<i class="fas ${hintIcon}"></i> ${hintLabel}`;
+            }
+            if (fixedOptimalBtn) {
+                fixedOptimalBtn.disabled = !canOptimal;
+            }
         }
     }
 
@@ -2644,11 +3790,7 @@ class MathTutorAI {
     }
 
     async generateAbiTask() {
-        if (!this.apiKey) {
-            this.showNotification('Bitte konfiguriere zuerst deinen API-Schlüssel im Profil-Tab.', 'warning');
-            document.querySelector('[data-tab="user-profile"]').click();
-            return;
-        }
+        // API wird über Backend-Proxy verwaltet
 
         const statusElement = document.getElementById('abi-generator-status');
         if (statusElement) {
@@ -2758,12 +3900,54 @@ ANWEISUNGEN:
 
     /**
      * Baut den Prompt für die strukturierte Fehleranalyse
+     * Routet zum passenden Prompt-Builder basierend auf Aufgabentyp
+     * INKLUSIVE algorithmischer Pre-Validierung für verdächtige Stellen
      * @param {Object} params - Parameter
-     * @returns {Object} - { systemPrompt, userPrompt }
+     * @returns {Object} - { systemPrompt, userPrompt, schema }
      */
     buildErrorAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber = 1, previousAnalysis = null, studentContext = null }) {
+        // Aufgabentyp aus dem Kontext holen
+        const taskType = this.currentTaskContext?.taskType || 'berechnung';
+        
+        console.log('[buildErrorAnalysisPrompt] Routing für Aufgabentyp:', taskType);
+        
+        // ==== ALGORITHMISCHE PRE-VALIDIERUNG ====
+        // Prüfe die Lösung vorab auf verdächtige Stellen
+        let preValidationHints = '';
+        if (userSolution && (taskType === 'berechnung' || taskType === 'sachaufgabe')) {
+            const suspiciousSteps = preValidateSolutionSteps(userSolution);
+            if (suspiciousSteps.length > 0) {
+                preValidationHints = '\n\n⚠️ ALGORITHMISCHE VORPRÜFUNG - VERDÄCHTIGE STELLEN:\n';
+                preValidationHints += 'Die folgenden Stellen wurden algorithmisch als potenziell fehlerhaft identifiziert.\n';
+                preValidationHints += 'Prüfe diese Stellen BESONDERS GENAU:\n';
+                suspiciousSteps.forEach(s => {
+                    preValidationHints += `- Zeile ${s.lineNumber}: ${s.reason}\n`;
+                    if (s.content) preValidationHints += `  Inhalt: "${s.content}"\n`;
+                });
+                preValidationHints += '\nDiese Hinweise sind nur Vorschläge - prüfe trotzdem ALLE Schritte sorgfältig!\n';
+                console.log('[buildErrorAnalysisPrompt] Pre-validation found suspicious steps:', suspiciousSteps);
+            }
+        }
+        
+        // Route zum passenden Prompt-Builder (mit Pre-Validierung)
+        switch(taskType) {
+            case 'theorie':
+                return this._buildTheoryAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber, previousAnalysis, studentContext });
+            case 'sachaufgabe':
+                return this._buildWordProblemAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber, previousAnalysis, studentContext, preValidationHints });
+            case 'berechnung':
+            default:
+                return this._buildCalculationAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber, previousAnalysis, studentContext, preValidationHints });
+        }
+    }
+    
+    /**
+     * Prompt für reine Berechnungs-Aufgaben (Original-Logik)
+     * @private
+     */
+    _buildCalculationAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber = 1, previousAnalysis = null, studentContext = null, preValidationHints = '' }) {
         // Dynamische Kontextdaten
-        const taskType = this.currentTaskContext?.topic || 'Mathematik';
+        const topicName = this.currentTaskContext?.topic || 'Mathematik';
         const taskSubType = this.currentTaskContext?.subTopic || '';
         const difficulty = this.currentTaskContext?.difficulty || 'mittel';
         
@@ -2807,7 +3991,7 @@ Beachte:
 === SCHÜLERKONTEXT ===
 ${strengthsText ? `Stärken: ${strengthsText}` : ''}
 ${weaknessesText ? `Schwächen/Lernbedarf: ${weaknessesText}` : ''}
-Aufgabentyp: ${taskType}${taskSubType ? ` > ${taskSubType}` : ''}
+Thema: ${topicName}${taskSubType ? ` > ${taskSubType}` : ''}
 Schwierigkeit: ${difficulty}
 `;
         }
@@ -2815,7 +3999,7 @@ Schwierigkeit: ${difficulty}
         // Kompetenz-Schema für strukturierte Analyse
         const competencySchemaSection = this._buildCompetencySchemaSection();
 
-        // ULTRA-KOMPAKTER PROMPT - Hints + Feedback werden programmatisch generiert
+        // Prompt mit Anweisungen für inhaltliches Feedback
         const systemPrompt = `Mathe-Fehleranalyse. Gib JSON zurück.
 
 KERNREGEL: Schülertext 1:1 in LaTeX (Fehler beibehalten, NICHT korrigieren!)
@@ -2825,9 +4009,73 @@ AUFGABEN:
 2. index MUSS fortlaufend sein: 1, 2, 3, ... (NICHT mehrmals dieselbe Nummer!)
 3. operation pro Schritt (außer letztem): z.B. ":2", "+3", "zgf."
 4. errorType: logic (P1) > calc (P2) > followup (P3) > formal > none
-5. competencyAnalysis: Bewerte gezeigte Kompetenzen (1-10)
+5. hintQuestion bei Fehlern: Eine SPEZIFISCHE Frage die sich auf den KONKRETEN Fehler bezieht.
+   - Nenne die genaue Stelle/Wert wo der Fehler liegt
+   - NICHT verraten WIE es richtig geht, aber ZEIGEN WO das Problem ist
+   - WICHTIG: NUR einfacher Text und Unicode-Symbole (ε, δ, ≤, ≥, ², ³, ·, π, ∞)!
+   - KEINE LaTeX-Befehle wie \frac, \sqrt, x^{...}, \ge, \le etc.!
+   Gute Beispiele: "Was ergibt (-3)²?", "Ist -10δ richtig bei (10+δ/2)²?"
+   Schlechte: "Stimmt das?", "\frac{1}{2}·(-1)" (enthält LaTeX!)
+   Bei errorType="none" leer lassen.
+6. competencyAnalysis: Bewerte gezeigte Kompetenzen (1-10)
 
-OUTPUT: {"steps":[{"index":1,...},{"index":2,...}],"isCorrect":true/false,"feedback":{...},"competencyAnalysis":{...}}
+=== DETAILEDFEEDBACK - WICHTIG: IMMER GENERIEREN! ===
+Du MUSST detailedFeedback generieren mit mathematisch konkretem Inhalt!
+VERWENDE NUR PLAIN TEXT - keine LaTeX-Befehle, keine Semikolons am Ende!
+
+strengths (Was gut war) - NENNE DAS KONKRETE KONZEPT:
+- SCHLECHT: "Der Lösungsansatz war richtig" (zu generisch!)
+- SCHLECHT: "Die Schritte 1, 2, 3 waren korrekt" (Schrittnummern sagen nichts!)
+- GUT: "Die Substitution u=x² wurde korrekt durchgeführt"
+- GUT: "Das Anwenden der Kettenregel bei e^(x²) war richtig"
+- GUT: "Die Partialbruchzerlegung wurde korrekt angesetzt"
+
+weaknesses (Verbesserungspotential) - KONKRETE LERNEMPFEHLUNG FÜR JEDEN FEHLER:
+- SCHLECHT: "Bei Schritt 8: logic" oder "In Schritt 11 liegt ein Fehler" (sagt nichts!)
+- SCHLECHT: "Überlege welche Methode passt" (zu vage!)
+- GUT: "Bei der Grenzwertberechnung: Die Summenregel darf nur angewendet werden wenn beide Einzelgrenzwerte existieren"
+- GUT: "Das Ableiten von Produkten erfordert die Produktregel: (fg)' = f'g + fg'"
+- GUT: "Bei Substitution müssen auch die Integrationsgrenzen angepasst werden"
+
+tips (Merksätze) - MAXIMAL 2-3 AUFGABENSPEZIFISCHE TIPPS:
+- SCHLECHT: "Achte auf Vorzeichen" oder "Prüfe deine Rechnung" (zu generisch!)
+- GUT: "Merke: Bei ε-δ-Beweisen muss δ von ε abhängen, nicht umgekehrt"
+- GUT: "Bei Grenzwerten: lim(a+b) = lim(a) + lim(b) gilt nur wenn beide Grenzwerte existieren"
+
+=== HINTS - GESTAFFELTE HILFESTELLUNG ===
+
+LEVEL 1 (hints.level1): Leitfragen die zum Nachdenken anregen
+- Formuliere als FRAGEN die den Schüler selbst zum Fehler führen
+- Beziehe dich auf den KONKRETEN Fehler (nicht generisch)
+- SCHLECHT: "Rechenfehler" oder "Prüfe Schritt 3"
+- GUT: "Was ergibt (-3)²? Ist das Vorzeichen richtig?"
+- GUT: "Kannst du die Summenregel für Grenzwerte hier direkt anwenden?"
+- GUT: "Muss der Zählergrad kleiner sein als der Nennergrad bei Partialbruchzerlegung?"
+
+LEVEL 2 (hints.level2): Lösungskonzept andeuten (WIE löst man es?)
+- NICHT Level 1 wiederholen! Level 2 gibt KONSTRUKTIVEN Hinweis
+- Gib den stepIndex des fehlerhaften Schritts an!
+- SCHLECHT: "Rechne nochmal nach" (zu vage)
+- GUT: "Versuche die Summe erst in zwei separate Grenzwerte aufzuteilen"
+- GUT: "Hier könnte die Substitution u = x² helfen"
+- GUT: "Wende die Produktregel an: (f·g)' = f'·g + f·g'"
+
+OUTPUT-STRUKTUR (VOLLSTÄNDIG):
+{
+  "steps": [...],
+  "isCorrect": false,
+  "feedback": {"summarySentence": "..."},
+  "detailedFeedback": {"strengths": [...], "weaknesses": [...], "tips": [...]},
+  "hints": {
+    "level1": [
+      {"hintLevel": 1, "category": "wrong_method", "label": "Leitfrage zum Nachdenken, z.B. 'Was ergibt (-3)²?'", "color": "orange"}
+    ],
+    "level2": [
+      {"hintLevel": 2, "category": "formula_hint", "stepIndex": 3, "solutionApproach": "Konstruktiver Hinweis wie man es löst", "latex": "", "color": "blue"}
+    ]
+  },
+  "competencyAnalysis": {...}
+}
 Nur reiner LaTeX (keine Delimiter).
 ${competencySchemaSection}${studentContextSection}${previousFeedbackSection}`;
 
@@ -2837,12 +4085,329 @@ ${this.currentTask}
 Lösung des Schülers (Lösungsversuch ${attemptNumber}):
 ${userSolution || '(Keine schriftliche Lösung, nur Zeichnung)'}
 ${drawingInfo}
-
+${preValidationHints}
 Analysiere den Lösungsweg und gib das Ergebnis als JSON im vorgegebenen Schema zurück.
 Achte darauf, bei jedem Schritt (außer dem letzten) das "operation"-Feld anzugeben.
 Füge auch "competencyAnalysis" hinzu mit den identifizierten Kompetenzen und Ratings (1-10).`;
 
-        return { systemPrompt, userPrompt };
+        return { systemPrompt, userPrompt, schema: ERROR_ANALYSIS_SCHEMA };
+    }
+    
+    /**
+     * Prompt für Sachaufgaben (mit Antwortsatz-Prüfung)
+     * @private
+     */
+    _buildWordProblemAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber = 1, previousAnalysis = null, studentContext = null, preValidationHints = '' }) {
+        // Dynamische Kontextdaten
+        const topicName = this.currentTaskContext?.topic || 'Mathematik';
+        const taskSubType = this.currentTaskContext?.subTopic || '';
+        const difficulty = this.currentTaskContext?.difficulty || 'mittel';
+        
+        // Stärken und Schwächen aus studentContext
+        let strengthsText = '';
+        let weaknessesText = '';
+        
+        if (studentContext) {
+            if (studentContext.strongAreas && studentContext.strongAreas.topics && studentContext.strongAreas.topics.length > 0) {
+                strengthsText = studentContext.strongAreas.topics
+                    .map(t => `${t.topic} (Level ${t.level}/5)`)
+                    .join(', ');
+            }
+            if (studentContext.weakAreas && studentContext.weakAreas.topics && studentContext.weakAreas.topics.length > 0) {
+                weaknessesText = studentContext.weakAreas.topics
+                    .map(t => `${t.topic} (Level ${t.level}/5)`)
+                    .join(', ');
+            }
+        }
+
+        // Kontext für zweiten Versuch
+        let previousFeedbackSection = '';
+        if (attemptNumber > 1 && previousAnalysis) {
+            previousFeedbackSection = `
+=== VORHERIGER LÖSUNGSVERSUCH ===
+Dies ist der ${attemptNumber}. Lösungsversuch des Schülers.
+Vorherige Analyse (JSON):
+${JSON.stringify(previousAnalysis, null, 2)}
+
+Beachte:
+- Der Schüler hat versucht, seine Fehler zu korrigieren
+- Prüfe ob der Antwortsatz jetzt vorhanden/korrekt ist
+- Prüfe ob die vorherigen Fehler behoben wurden
+`;
+        }
+
+        // Schülerkontext-Sektion
+        let studentContextSection = '';
+        if (strengthsText || weaknessesText) {
+            studentContextSection = `
+=== SCHÜLERKONTEXT ===
+${strengthsText ? `Stärken: ${strengthsText}` : ''}
+${weaknessesText ? `Schwächen/Lernbedarf: ${weaknessesText}` : ''}
+Thema: ${topicName}${taskSubType ? ` > ${taskSubType}` : ''}
+Schwierigkeit: ${difficulty}
+`;
+        }
+
+        // Kompetenz-Schema für strukturierte Analyse
+        const competencySchemaSection = this._buildCompetencySchemaSection();
+
+        const systemPrompt = `Sachaufgaben-Analyse (Textaufgabe). Gib JSON zurück.
+
+KERNREGEL: Schülertext 1:1 in LaTeX (Fehler beibehalten, NICHT korrigieren!)
+
+AUFGABEN:
+1. Rechenweg analysieren wie bei normalen Aufgaben:
+   - Schritte zerlegen (je Schritt eine Umformung)
+   - index fortlaufend: 1, 2, 3, ...
+   - errorType: logic > calc > followup > formal > none
+   - hintQuestion bei Fehlern: SPEZIFISCHE Frage die auf den KONKRETEN Fehler zeigt.
+     Nenne die genaue Stelle/Wert! NICHT verraten WIE es richtig geht, aber ZEIGEN WO das Problem ist.
+     WICHTIG: NUR Unicode-Symbole (≤, ≥, ², ³, ·), KEINE LaTeX-Befehle (\frac, \sqrt, etc.)!
+     Gute: "Hat '50 km/h' die richtige Einheit?", "Was ergibt 3·4?" Schlecht: "\frac{1}{2}" (LaTeX!)
+
+2. WICHTIG - Antwortsatz prüfen:
+   - Hat der Schüler einen Antwortsatz geschrieben?
+   - Ist der Antwortsatz vollständig (Kontext + Ergebnis + Einheit)?
+   - Bei fehlendem Antwortsatz: Vorschlag generieren
+   - Probleme identifizieren: no_sentence, no_unit, wrong_unit, incomplete_answer, context_missing
+
+3. Realweltbezug bewerten:
+   - Wurde der Kontext der Aufgabe beibehalten?
+   - Sind die Einheiten korrekt?
+
+=== DETAILEDFEEDBACK - WICHTIG: IMMER GENERIEREN! ===
+Du MUSST detailedFeedback generieren! NUR PLAIN TEXT - keine LaTeX, keine Semikolons!
+
+strengths (Was gut war) - NENNE DAS KONKRETE KONZEPT:
+- SCHLECHT: "Schritte 1-3 waren korrekt" (zu generisch!)
+- GUT: "Das Aufstellen der Gleichung aus dem Sachkontext war korrekt"
+- GUT: "Die Umrechnung von km/h in m/s zeigt gutes Verständnis der Einheiten"
+
+weaknesses (Verbesserungspotential) - KONKRETE LERNEMPFEHLUNG:
+- SCHLECHT: "Bei Schritt 5: calc" (sagt nichts!)
+- SCHLECHT: "Überlege welche Formel passt" (zu vage!)
+- GUT: "Beim Umrechnen von Stunden in Minuten: 1h = 60min beachten"
+- GUT: "Der Antwortsatz muss die Einheit aus der Fragestellung enthalten"
+
+tips (Merksätze) - MAXIMAL 2-3 AUFGABENSPEZIFISCHE:
+- SCHLECHT: "Achte auf Einheiten" (zu generisch!)
+- GUT: "Bei Geschwindigkeitsaufgaben: Strecke und Zeit müssen die gleiche Basis haben"
+
+=== HINTS - GESTAFFELTE HILFESTELLUNG ===
+
+LEVEL 1 (hints.level1): Leitfragen die zum Nachdenken anregen
+- Formuliere als FRAGEN die den Schüler selbst zum Fehler führen
+- SCHLECHT: "Einheitenfehler" oder "Schritt 2 prüfen"
+- GUT: "Stimmt die Einheit km/h für diese Rechnung?"
+- GUT: "Was ist gegeben und was ist gesucht?"
+
+LEVEL 2 (hints.level2): Lösungskonzept andeuten
+- Gib den stepIndex des fehlerhaften Schritts an!
+- SCHLECHT: "Prüfe die Einheit" (zu vage)
+- GUT: "Wandle erst alle Größen in die gleiche Einheit um"
+- GUT: "Stelle dir vor, was die Aufgabe physikalisch bedeutet"
+
+OUTPUT-STRUKTUR (VOLLSTÄNDIG):
+{
+  "steps": [...],
+  "isCorrect": false,
+  "feedback": {"summarySentence": "..."},
+  "detailedFeedback": {"strengths": [...], "weaknesses": [...], "tips": [...]},
+  "hints": {
+    "level1": [
+      {"hintLevel": 1, "category": "wrong_method", "label": "Leitfrage, z.B. 'Stimmt die Einheit für diese Berechnung?'", "color": "orange"}
+    ],
+    "level2": [
+      {"hintLevel": 2, "category": "formula_hint", "stepIndex": 2, "solutionApproach": "Konstruktiver Hinweis", "latex": "", "color": "blue"}
+    ]
+  },
+  "answerSentence": {...}
+}
+Nur reiner LaTeX (keine Delimiter).
+${competencySchemaSection}${studentContextSection}${previousFeedbackSection}`;
+
+        const userPrompt = `SACHAUFGABE:
+${this.currentTask}
+
+Lösung des Schülers (Lösungsversuch ${attemptNumber}):
+${userSolution || '(Keine schriftliche Lösung, nur Zeichnung)'}
+${drawingInfo}
+${preValidationHints}
+Analysiere:
+1. Den Rechenweg (Schritte, Fehler)
+2. Das Aufgabenverständnis (Was ist gegeben? Was ist gesucht?)
+3. Den ANTWORTSATZ - Ist einer vorhanden? Ist er vollständig mit Kontext und Einheit?
+4. Behalte den Realweltbezug im Blick
+
+Gib das Ergebnis als JSON im vorgegebenen Schema zurück.`;
+
+        return { systemPrompt, userPrompt, schema: WORD_PROBLEM_SCHEMA };
+    }
+    
+    /**
+     * Prompt für Theorie-Aufgaben (Definitionen, Beweise, Erklärungen)
+     * @private
+     */
+    _buildTheoryAnalysisPrompt({ userSolution, drawingInfo, hasDrawings, attemptNumber = 1, previousAnalysis = null, studentContext = null }) {
+        // Dynamische Kontextdaten
+        const topicName = this.currentTaskContext?.topic || 'Mathematik';
+        const taskSubType = this.currentTaskContext?.subTopic || '';
+        const difficulty = this.currentTaskContext?.difficulty || 'mittel';
+        
+        // Stärken und Schwächen aus studentContext
+        let strengthsText = '';
+        let weaknessesText = '';
+        
+        if (studentContext) {
+            if (studentContext.strongAreas && studentContext.strongAreas.topics && studentContext.strongAreas.topics.length > 0) {
+                strengthsText = studentContext.strongAreas.topics
+                    .map(t => `${t.topic} (Level ${t.level}/5)`)
+                    .join(', ');
+            }
+            if (studentContext.weakAreas && studentContext.weakAreas.topics && studentContext.weakAreas.topics.length > 0) {
+                weaknessesText = studentContext.weakAreas.topics
+                    .map(t => `${t.topic} (Level ${t.level}/5)`)
+                    .join(', ');
+            }
+        }
+
+        // Kontext für zweiten Versuch
+        let previousFeedbackSection = '';
+        if (attemptNumber > 1 && previousAnalysis) {
+            previousFeedbackSection = `
+=== VORHERIGER LÖSUNGSVERSUCH ===
+Dies ist der ${attemptNumber}. Lösungsversuch des Schülers.
+Vorherige Analyse (JSON):
+${JSON.stringify(previousAnalysis, null, 2)}
+
+Beachte:
+- Der Schüler hat versucht, seine Antworten zu verbessern
+- Prüfe ob die vorherigen Ungenauigkeiten behoben wurden
+- Identifiziere neue oder fortbestehende Probleme
+`;
+        }
+
+        // Schülerkontext-Sektion
+        let studentContextSection = '';
+        if (strengthsText || weaknessesText) {
+            studentContextSection = `
+=== SCHÜLERKONTEXT ===
+${strengthsText ? `Stärken: ${strengthsText}` : ''}
+${weaknessesText ? `Schwächen/Lernbedarf: ${weaknessesText}` : ''}
+Thema: ${topicName}${taskSubType ? ` > ${taskSubType}` : ''}
+Schwierigkeit: ${difficulty}
+`;
+        }
+
+        // Kompetenz-Schema für strukturierte Analyse
+        const competencySchemaSection = this._buildCompetencySchemaSection();
+
+        const systemPrompt = `Theorie-Aufgaben-Analyse (Definitionen, Beweise, Erklärungen). Gib JSON zurück.
+
+AUFGABENTYPEN die du analysieren musst:
+- definition: Mathematische Begriffe präzise definieren
+- explanation: Konzepte, Zusammenhänge oder Verfahren erklären
+- proof: Mathematische Aussagen beweisen
+- comparison: Unterschiede/Gemeinsamkeiten erklären
+- example: Beispiele nennen oder konstruieren
+
+ANALYSESCHRITTE:
+1. Teilaufgaben identifizieren (a), b), c)... oder Einzelaufgabe)
+2. Jeden Teil der Schüler-Antwort der passenden Teilaufgabe zuordnen
+3. Für jede Teilaufgabe bewerten:
+   - correctness: "correct" (vollständig richtig), "partial" (teilweise), "incorrect" (falsch), "missing" (nicht beantwortet)
+   
+4. BEI FEHLERHAFTEN ANTWORTEN - SEHR WICHTIG:
+   - Erkläre GENAU warum die Antwort falsch/unvollständig ist
+   - Bei Definitionen: Welche wesentlichen Aspekte fehlen oder sind falsch?
+   - Bei Beweisen: Welche Schritte fehlen oder sind nicht schlüssig?
+   - Bei Erklärungen: Was wurde missverstanden oder ausgelassen?
+   - Gib die KORREKTE Antwort an
+   - Liste die Schlüsselaspekte auf und markiere, welche der Schüler genannt hat
+
+5. keyPoints: Identifiziere 3-5 Schlüsselaspekte die in einer guten Antwort enthalten sein sollten
+
+OUTPUT-SCHEMA:
+{
+  "taskType": "definition|explanation|proof|comparison|example|mixed",
+  "subTasks": [{
+    "label": "a)",
+    "question": "Die Teilfrage aus der Aufgabe",
+    "questionType": "definition|explanation|proof|comparison|example",
+    "studentAnswer": "Originalantwort des Schülers",
+    "correctness": "correct|partial|incorrect|missing",
+    "explanation": "DETAILLIERTE Erklärung warum richtig/falsch. Bei Definitionen z.B.: 'Die Schüler-Definition enthält zwar den Aspekt X, lässt aber den wesentlichen Aspekt Y aus. Außerdem ist die Aussage Z mathematisch unpräzise, denn...'",
+    "correctAnswer": "Die vollständige, korrekte Antwort",
+    "keyPoints": [
+      {"point": "Schlüsselaspekt 1", "present": true},
+      {"point": "Schlüsselaspekt 2", "present": false}
+    ]
+  }],
+  "missingAnswers": ["b)", "c)"],
+  "overallCorrect": false,
+  "overallAssessment": "excellent|good|partial|needs_work|incorrect",
+  "feedback": {
+    "summarySentence": "1-2 Sätze Zusammenfassung",
+    "conceptualUnderstanding": "Einschätzung des Verständnisses",
+    "improvementSuggestion": "Konkreter Verbesserungsvorschlag"
+  },
+  "hints": {
+    "level1": [{"hintLevel": 1, "category": "definition_hint|concept_hint|structure_hint", "label": "LEITFRAGE die zum Nachdenken anregt, z.B. 'Was bedeutet der Begriff X genau?'", "color": "orange|yellow|blue"}],
+    "level2": [{"hintLevel": 2, "category": "missing_aspect|wrong_concept|incomplete", "subTaskLabel": "a)", "solutionApproach": "Hinweis WIE man es richtig macht", "color": "blue|green|orange"}]
+  },
+  "detailedFeedback": {...}
+}
+
+=== DETAILEDFEEDBACK - INHALTLICH UND AUFGABENSPEZIFISCH ===
+Generiere IMMER detailedFeedback:
+
+strengths: Welche Konzepte hat der Schüler verstanden?
+- SCHLECHT: "Teilaufgabe a) war richtig"
+- GUT: "Das Verständnis der Epsilon-Delta-Definition zeigt sich in der korrekten Formulierung der Quantoren"
+- GUT: "Die Unterscheidung zwischen notwendiger und hinreichender Bedingung wurde korrekt erkannt"
+
+weaknesses: Konkrete Lernempfehlungen
+- SCHLECHT: "Bei Teilaufgabe b): incorrect"
+- GUT: "Wiederhole den Unterschied zwischen punktweiser und gleichmäßiger Konvergenz"
+- GUT: "Die Definition der Stetigkeit erfordert das Verständnis von Grenzwerten - hier liegt die Lücke"
+
+tips: Aufgabenspezifische Merksätze
+- SCHLECHT: "Lerne Definitionen auswendig"
+- GUT: "Bei Definitionen zu Konvergenz: Immer die Reihenfolge der Quantoren beachten - erst ε, dann N"
+
+=== HINTS - GESTAFFELTE HILFESTELLUNG ===
+
+LEVEL 1 (hints.level1): Leitfragen die zum Nachdenken anregen
+- Formuliere als FRAGEN die den Schüler selbst zur Lösung führen
+- SCHLECHT: "Definition unvollständig" oder "Beweis prüfen"
+- GUT: "Was bedeutet der Begriff 'Stetigkeit' mathematisch präzise?"
+- GUT: "Welche Bedingung fehlt in deiner Definition?"
+
+LEVEL 2 (hints.level2): Lösungskonzept andeuten
+- Gib subTaskLabel an (z.B. "a)") um den Bezug herzustellen!
+- SCHLECHT: "Was fehlt in deiner Definition?" (zu vage)
+- GUT: "Denke daran, dass bei Stetigkeit der Grenzwert an der Stelle existieren UND mit dem Funktionswert übereinstimmen muss"
+- GUT: "Beim Beweis der Konvergenz: Konstruiere ein konkretes N in Abhängigkeit von ε"
+${competencySchemaSection}${studentContextSection}${previousFeedbackSection}`;
+
+        const userPrompt = `THEORIE-AUFGABE:
+${this.currentTask}
+
+Antwort des Schülers (Lösungsversuch ${attemptNumber}):
+${userSolution || '(Keine Antwort gegeben)'}
+${drawingInfo}
+
+WICHTIG bei der Analyse:
+1. Ordne die Schüler-Antworten den Teilaufgaben zu
+2. Bei falschen/unvollständigen Antworten: Erkläre GENAU und AUSFÜHRLICH warum sie falsch sind
+3. Bei Definitionen: Prüfe auf mathematische Präzision und Vollständigkeit
+4. Bei Beweisen: Prüfe logische Schlüssigkeit und Vollständigkeit
+5. Gib immer die korrekte Antwort an wenn der Schüler falsch liegt
+6. Identifiziere die Schlüsselaspekte und markiere welche der Schüler genannt hat
+
+Gib das Ergebnis als JSON im vorgegebenen Schema zurück.`;
+
+        return { systemPrompt, userPrompt, schema: THEORY_ANALYSIS_SCHEMA };
     }
 
     /**
@@ -2963,7 +4528,10 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
      * @returns {Promise<Object>} - Geparstes TutorResponse JSON
      */
     async callErrorAnalysisAPI(prompts) {
-        const { systemPrompt, userPrompt } = prompts;
+        const { systemPrompt, userPrompt, schema } = prompts;
+        
+        // Verwende das übergebene Schema oder fallback auf ERROR_ANALYSIS_SCHEMA
+        const analysisSchema = schema || ERROR_ANALYSIS_SCHEMA;
         
         let model;
         if (this.apiProvider === 'openai') {
@@ -2977,78 +4545,41 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
             content: userPrompt
         };
 
-        let requestBody;
-        let apiUrl;
-        let headers = {
-            'Content-Type': 'application/json'
-        };
+        // API-Aufruf über Backend-Proxy
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            userMessage
+        ];
 
-        if (this.apiProvider === 'openai') {
-            apiUrl = 'https://api.openai.com/v1/chat/completions';
-            headers['Authorization'] = `Bearer ${this.apiKey}`;
+        // Für Anthropic: Tool-basierte strukturierte Ausgabe
+        let tools = null;
+        let toolChoice = null;
+        
+        if (this.apiProvider === 'anthropic') {
+            const toolName = analysisSchema.name === 'theory_analysis_response' ? 'submit_theory_analysis' :
+                            analysisSchema.name === 'word_problem_analysis_response' ? 'submit_word_problem_analysis' :
+                            'submit_error_analysis';
             
-            // Minimale Schema-Referenz - Hints werden programmatisch generiert
-            const schemaInstructions = ``;
-            
-            requestBody = {
-                model: model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: systemPrompt + schemaInstructions
-                    },
-                    userMessage
-                ],
-                max_completion_tokens: 4000,
-                temperature: 0.3,
-                response_format: {
-                    type: 'json_object'
-                }
-            };
-        } else {
-            // Anthropic - Tool Use für strukturierte Ausgabe
-            apiUrl = 'https://api.anthropic.com/v1/messages';
-            headers['x-api-key'] = this.apiKey;
-            headers['anthropic-version'] = '2023-06-01';
-            
-            const toolDefinition = {
-                name: 'submit_error_analysis',
-                description: 'Strukturierte Fehleranalyse des Schüler-Lösungswegs',
-                input_schema: ERROR_ANALYSIS_SCHEMA.schema
-            };
-            
-            requestBody = {
-                model: model,
-                system: systemPrompt,
-                messages: [userMessage],
-                max_tokens: 4000,
-                temperature: 0.3,
-                tools: [toolDefinition],
-                tool_choice: { type: 'tool', name: 'submit_error_analysis' }
-            };
+            tools = [{
+                name: toolName,
+                description: 'Strukturierte Analyse der Schüler-Lösung',
+                input_schema: analysisSchema.schema
+            }];
+            toolChoice = { type: 'tool', name: toolName };
         }
 
-        console.log('[ErrorAnalysis] Sending API request:', { provider: this.apiProvider, model });
+        console.log('[ErrorAnalysis] Sending API request via proxy:', { provider: this.apiProvider, model, schema: analysisSchema.name });
 
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(requestBody)
+        const data = await this.callAIProxy({
+            provider: this.apiProvider,
+            messages: messages,
+            model: model,
+            max_tokens: 4000,
+            temperature: 0.3,
+            tools: tools,
+            tool_choice: toolChoice,
+            response_format: this.apiProvider === 'openai' ? { type: 'json_object' } : null
         });
-
-        if (!response.ok) {
-            let errorDetails = '';
-            try {
-                const errorData = await response.json();
-                console.error('[ErrorAnalysis] API Error Details:', errorData);
-                errorDetails = errorData.error?.message || JSON.stringify(errorData);
-            } catch (e) {
-                errorDetails = response.statusText;
-            }
-            throw new Error(`API-Fehler (${response.status}): ${errorDetails}`);
-        }
-
-        const data = await response.json();
         console.log('[ErrorAnalysis] API Response:', data);
 
         // Parse die strukturierte Antwort
@@ -3123,10 +4654,42 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
         }
         parsedResponse.hints.level1 = Array.isArray(parsedResponse.hints.level1) ? parsedResponse.hints.level1 : [];
         parsedResponse.hints.level2 = Array.isArray(parsedResponse.hints.level2) ? parsedResponse.hints.level2 : [];
-        parsedResponse.hints.level2 = parsedResponse.hints.level2.map(h => ({
-            ...h,
-            latex: h?.latex ? sanitizeLatex(h.latex) : ''
-        }));
+        
+        // Normalisiere Level 1 Hints: Stelle sicher dass 'label' existiert
+        parsedResponse.hints.level1 = parsedResponse.hints.level1.map((h, idx) => {
+            // Fallback-Kette: label > text > question > hintQuestion
+            const label = h.label || h.text || h.question || h.hintQuestion || '';
+            return {
+                ...h,
+                label: label,
+                hintLevel: h.hintLevel || 1,
+                category: h.category || 'wrong_method',
+                color: h.color || 'orange'
+            };
+        });
+        
+        // Normalisiere Level 2 Hints: Stelle sicher dass 'stepIndex' und 'solutionApproach' existieren
+        const errorSteps = (parsedResponse.steps || []).filter(s => s.errorType && s.errorType !== 'none' && s.errorType !== 'followup');
+        parsedResponse.hints.level2 = parsedResponse.hints.level2.map((h, idx) => {
+            // stepIndex aus dem Hint oder vom korrespondierenden Fehler-Schritt ableiten
+            let stepIndex = h.stepIndex;
+            if (stepIndex === undefined || stepIndex === null) {
+                // Versuche den stepIndex vom entsprechenden Fehler-Schritt zu nehmen
+                const correspondingError = errorSteps[idx];
+                stepIndex = correspondingError?.index || (idx + 1);
+            }
+            // solutionApproach: Fallback auf text oder title
+            const solutionApproach = h.solutionApproach || h.text || h.title || 'Überdenke diesen Schritt nochmal.';
+            return {
+                ...h,
+                stepIndex: stepIndex,
+                solutionApproach: solutionApproach,
+                latex: h?.latex ? sanitizeLatex(h.latex) : '',
+                hintLevel: h.hintLevel || 2,
+                category: h.category || 'formula_hint',
+                color: h.color || 'blue'
+            };
+        });
 
         // Fallback-Hints generieren, falls keine geliefert wurden (z.B. Testmodus)
         const hasNoHints = (!parsedResponse.hints.level1 || parsedResponse.hints.level1.length === 0)
@@ -3140,6 +4703,15 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
         if (typeof validateErrorMarkings === 'function') {
             parsedResponse = validateErrorMarkings(parsedResponse);
             console.log('[ErrorAnalysis] Validation applied, corrections made:', parsedResponse._correctionsMade || 0);
+        }
+        
+        // Korrigiere logisch ungültige Folgefehler
+        // Der erste Fehler kann niemals ein Folgefehler sein
+        if (typeof fixFollowupErrors === 'function') {
+            parsedResponse = fixFollowupErrors(parsedResponse);
+            if (parsedResponse._followupCorrections > 0) {
+                console.log('[ErrorAnalysis] Followup corrections applied:', parsedResponse._followupCorrections);
+            }
         }
 
         // Validiere mit TutorModel falls verfügbar
@@ -3199,13 +4771,17 @@ Rating: 1-3=schwach, 4-6=mittel, 7-10=gut. Nur 2-4 relevante Kompetenzen bewerte
         }
 
         // ULTRA-KOMPAKTER PROMPT - Hints werden programmatisch generiert
-        const systemPrompt = `Folge-Analyse (Versuch ${attemptNumber}). Schüler hat Korrekturen eingereicht.
+        const systemPrompt = `Folge-Analyse (Versuch ${attemptNumber}). Schüler hat Korrekturen eingereicht. Gib die Analyse als JSON zurück.
 
 KERNREGEL: Schülertext 1:1 in LaTeX (Fehler beibehalten, NICHT korrigieren!)
 
 FOLGEFEHLER: Wenn korrigierter Schritt jetzt korrekt → Folgefehler werden "none" (wenn nur durch alten Fehler falsch).
 
-OUTPUT: {"steps":[{"index":1,"rawText":"...","latex":"...","errorType":"...","operation":"..."}],"isCorrect":true/false,"feedback":{"summarySentence":"1-2 Sätze, ob Korrektur erfolgreich"}}
+Bei Fehlern: Generiere eine "hintQuestion" - eine SPEZIFISCHE Frage die auf den KONKRETEN Fehler zeigt.
+Nenne die genaue Stelle/Wert! NUR Unicode-Symbole (≤, ≥, ², ·), KEINE LaTeX (\frac, \sqrt)!
+Gute: "Was ergibt (-3)²?", "Ist -10δ richtig bei (10+δ/2)²?" Schlecht: "\frac{1}{2}" (LaTeX!)
+
+JSON-OUTPUT: {"steps":[{"index":1,"rawText":"...","latex":"...","errorType":"...","hintQuestion":"...","operation":"..."}],"isCorrect":true/false,"feedback":{"summarySentence":"1-2 Sätze, ob Korrektur erfolgreich"}}
 Nur reiner LaTeX (keine Delimiter).`;
 
         const userPrompt = `Aufgabe: ${this.currentTask}
@@ -3391,13 +4967,60 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
     }
 
     checkApiConfiguration() {
-        if (!this.apiKey) {
-            this.showApiModal();
+        // API-Key wird jetzt über Backend-Proxy verwaltet
+        // Keine Konfiguration im Frontend mehr nötig
+        return true;
+    }
+
+    /**
+     * Ruft die AI API über den Backend-Proxy auf
+     * @param {Object} params - Parameter für den API-Aufruf
+     * @param {string} params.provider - 'openai' oder 'anthropic'
+     * @param {Array} params.messages - Chat-Messages im OpenAI-Format
+     * @param {string} params.model - Model-Name (optional)
+     * @param {number} params.max_tokens - Max Tokens (optional)
+     * @param {number} params.temperature - Temperature (optional)
+     * @param {Array} params.tools - Tool definitions (optional)
+     * @param {Object} params.tool_choice - Tool choice (optional)
+     * @param {Object} params.response_format - Response format (optional)
+     * @returns {Promise<Object>} API Response im OpenAI-Format
+     */
+    async callAIProxy(params) {
+        const response = await fetch(this.proxyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                provider: params.provider || this.apiProvider,
+                messages: params.messages,
+                model: params.model,
+                max_tokens: params.max_tokens || 4096,
+                temperature: params.temperature || 0.7,
+                tools: params.tools,
+                tool_choice: params.tool_choice,
+                response_format: params.response_format
+            })
+        });
+
+        if (!response.ok) {
+            let errorDetails = '';
+            try {
+                const errorData = await response.json();
+                console.error('AI Proxy Error:', errorData);
+                errorDetails = errorData.error || JSON.stringify(errorData);
+            } catch (e) {
+                errorDetails = response.statusText;
+            }
+            throw new Error(`AI-Fehler (${response.status}): ${errorDetails}`);
         }
+
+        return await response.json();
     }
 
     showApiModal() {
-        document.getElementById('api-config-modal').style.display = 'flex';
+        // Modal wurde entfernt - API wird über Backend-Proxy verwaltet
+        this.showNotification('AI-Funktionen sind serverseitig konfiguriert.', 'info');
     }
 
     closeApiModal() {
@@ -3431,24 +5054,250 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             return;
         }
 
-        if (!this.apiKey) {
-            this.showNotification('Bitte konfiguriere zuerst deinen API-Schlüssel im Profil-Tab.', 'warning');
-            // Wechsle automatisch zum Profil-Tab
-            document.querySelector('[data-tab="user-profile"]').click();
-            return;
-        }
+        // API wird über Backend-Proxy verwaltet
 
         this.showLoading(true);
         
         try {
-            const response = await this.callAIAPI(textInput, 'analyze');
+            let response;
+            
+            // Prüfe ob dies eine Follow-up Frage mit Kontext ist
+            if (this.explanationContext.hasContext) {
+                // Follow-up Frage mit vorherigem Kontext
+                response = await this.callAIAPIWithContext(textInput);
+            } else {
+                // Neue Frage ohne Kontext
+                response = await this.callAIAPI(textInput, 'analyze');
+                
+                // Speichere den Kontext für mögliche Follow-up Fragen
+                this.explanationContext = {
+                    originalQuestion: textInput,
+                    originalResponse: response,
+                    hasContext: true
+                };
+            }
+            
             this.displayResults(response);
+            
+            // Zeige Follow-up Input-Bereich nach der Erklärung
+            this.showFollowupInputArea();
+            
         } catch (error) {
             console.error('Fehler bei der KI-Analyse:', error);
             this.showNotification('Fehler bei der KI-Analyse. Bitte versuche es erneut.', 'error');
         } finally {
             this.showLoading(false);
         }
+    }
+    
+    /**
+     * API-Aufruf mit vorherigem Kontext für Follow-up Fragen
+     */
+    async callAIAPIWithContext(followupQuestion) {
+        const context = this.explanationContext;
+        
+        // Baue den Kontext-Prompt
+        const contextPrompt = `VORHERIGER KONTEXT:
+Ursprüngliche Frage: ${context.originalQuestion}
+
+Bisherige Erklärung: ${context.originalResponse}
+
+---
+NEUE FOLLOW-UP FRAGE:
+${followupQuestion}
+
+Beantworte diese Frage unter Berücksichtigung des vorherigen Kontexts. Beziehe dich auf die ursprüngliche Aufgabe und Erklärung, wenn relevant.`;
+
+        return await this.callAIAPI(contextPrompt, 'analyze');
+    }
+    
+    /**
+     * Zeigt den Follow-up Input-Bereich nach einer Erklärung
+     */
+    showFollowupInputArea() {
+        // Entferne existierende Follow-up Bereiche
+        const existingFollowup = document.getElementById('followup-input-area');
+        if (existingFollowup) {
+            existingFollowup.remove();
+        }
+        
+        // Finde den Result-Bereich
+        const resultArea = document.getElementById('result-area');
+        if (!resultArea) return;
+        
+        // Erstelle den Follow-up Bereich
+        const followupArea = document.createElement('div');
+        followupArea.id = 'followup-input-area';
+        followupArea.className = 'followup-input-area';
+        followupArea.style.cssText = `
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--surface-2);
+            border-radius: 8px;
+            border: 1px solid var(--surface-3);
+        `;
+        
+        // Kontext-Indicator
+        const contextIndicator = document.createElement('div');
+        contextIndicator.className = 'context-indicator';
+        contextIndicator.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--surface-3);
+        `;
+        contextIndicator.innerHTML = `
+            <span style="color: var(--text-secondary); font-size: 0.9rem;">
+                <i class="fas fa-history"></i> Kontext aktiv - du kannst weitere Fragen zu dieser Erklärung stellen
+            </span>
+            <button id="clear-context-btn" class="btn btn-ghost btn-sm" style="color: var(--text-muted);">
+                <i class="fas fa-times"></i> Kontext löschen
+            </button>
+        `;
+        followupArea.appendChild(contextIndicator);
+        
+        // Follow-up Input
+        const inputContainer = document.createElement('div');
+        inputContainer.style.cssText = 'display: flex; gap: 10px; align-items: flex-end;';
+        
+        const textarea = document.createElement('textarea');
+        textarea.id = 'followup-input';
+        textarea.placeholder = 'Weitere Frage zu dieser Erklärung stellen...';
+        textarea.rows = 2;
+        textarea.style.cssText = `
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--surface-3);
+            border-radius: 6px;
+            background: var(--surface-1);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            resize: vertical;
+        `;
+        inputContainer.appendChild(textarea);
+        
+        const submitBtn = document.createElement('button');
+        submitBtn.className = 'btn btn-primary';
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+        submitBtn.style.cssText = 'padding: 10px 15px; height: fit-content;';
+        inputContainer.appendChild(submitBtn);
+        
+        followupArea.appendChild(inputContainer);
+        
+        // Füge den Follow-up Bereich nach dem Result-Bereich ein
+        resultArea.appendChild(followupArea);
+        
+        // Event Listeners
+        const clearBtn = followupArea.querySelector('#clear-context-btn');
+        clearBtn.addEventListener('click', () => {
+            this.clearExplanationContext();
+        });
+        
+        submitBtn.addEventListener('click', () => {
+            this.submitFollowupQuestion();
+        });
+        
+        // Enter-Taste zum Absenden (Shift+Enter für neue Zeile)
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.submitFollowupQuestion();
+            }
+        });
+    }
+    
+    /**
+     * Sendet eine Follow-up Frage
+     */
+    async submitFollowupQuestion() {
+        const textarea = document.getElementById('followup-input');
+        if (!textarea) return;
+        
+        const question = textarea.value.trim();
+        if (!question) {
+            this.showNotification('Bitte gib eine Frage ein.', 'warning');
+            return;
+        }
+        
+        // Kopiere die Frage ins Hauptfeld und löse die Analyse aus
+        const mainInput = document.getElementById('math-input');
+        if (mainInput) {
+            mainInput.value = question;
+        }
+        
+        // Führe die Analyse aus (mit aktivem Kontext)
+        await this.analyzeTextInput();
+        
+        // Leere das Follow-up Feld
+        textarea.value = '';
+    }
+    
+    /**
+     * Löscht den Erklärungskontext für eine neue Frage
+     */
+    clearExplanationContext() {
+        this.explanationContext = {
+            originalQuestion: null,
+            originalResponse: null,
+            hasContext: false
+        };
+        
+        // Entferne Follow-up Bereich
+        const followupArea = document.getElementById('followup-input-area');
+        if (followupArea) {
+            followupArea.remove();
+        }
+        
+        // Leere das Haupteingabefeld
+        const mainInput = document.getElementById('math-input');
+        if (mainInput) {
+            mainInput.value = '';
+            mainInput.focus();
+        }
+        
+        this.showNotification('Kontext gelöscht. Du kannst jetzt eine neue Frage stellen.', 'info');
+    }
+
+    /**
+     * Navigiert zum "Aufgabe Erklären" Tab und füllt die Frage vor
+     * @param {string} taskDescription - Die Aufgabenbeschreibung
+     */
+    navigateToExplainTab(taskDescription) {
+        // Lösche vorherigen Kontext - es ist eine neue Erklärung
+        this.explanationContext = {
+            originalQuestion: null,
+            originalResponse: null,
+            hasContext: false
+        };
+        
+        // Entferne existierenden Follow-up Bereich
+        const existingFollowup = document.getElementById('followup-input-area');
+        if (existingFollowup) {
+            existingFollowup.remove();
+        }
+        
+        // Finde und klicke den Sidebar-Nav-Item für "text-input"
+        const navItem = document.querySelector('.sidebar-nav .nav-item[data-section="text-input"]');
+        if (navItem) {
+            navItem.click();
+        }
+        
+        // Fülle das Textfeld mit der vorformulierten Frage
+        const textInput = document.getElementById('math-input');
+        if (textInput && taskDescription) {
+            const prefillText = `Erkläre mir folgende Aufgabe Schritt für Schritt:\n\n${taskDescription}`;
+            textInput.value = prefillText;
+            
+            // Fokussiere das Eingabefeld
+            textInput.focus();
+            
+            // Scroll zum Eingabefeld
+            textInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        this.showNotification('Aufgabe wurde übertragen. Klicke auf "Erklärung erhalten" für eine detaillierte Erklärung.', 'info');
     }
 
     async analyzeImageInput() {
@@ -3459,12 +5308,7 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             return;
         }
 
-        if (!this.apiKey) {
-            this.showNotification('Bitte konfiguriere zuerst deinen API-Schlüssel im Profil-Tab.', 'warning');
-            // Wechsle automatisch zum Profil-Tab
-            document.querySelector('[data-tab="user-profile"]').click();
-            return;
-        }
+        // API wird über Backend-Proxy verwaltet
 
         this.showLoading(true);
 
@@ -3490,6 +5334,10 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
      * Initialisiert die erweiterte Aufgabengenerierungs-UI
      */
     setupTaskGenerationUI() {
+        console.log('[TaskGenUI] setupTaskGenerationUI called');
+        console.log('[TaskGenUI] MATH_TOPICS available:', typeof window.MATH_TOPICS !== 'undefined');
+        console.log('[TaskGenUI] topic-search-input exists:', !!document.getElementById('topic-search-input'));
+        
         // Speichere die aktuelle Auswahl
         this.taskGenerationState = {
             topic: null,
@@ -3499,25 +5347,22 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             specialWishes: ''
         };
         
-        // Befülle das Themen-Dropdown aus topic-data.js
-        this.populateTopicDropdown();
+        // Initialisiere die Themen-Liste für Fuzzy-Suche
+        this.topicSearchState = {
+            allTopics: [],
+            highlightedIndex: -1,
+            isOpen: false,
+            preventClose: false,
+            initialized: false,
+            initRetryCount: 0
+        };
         
-        // Topic-Select Event
-        const topicSelect = document.getElementById('topic-select');
-        if (topicSelect) {
-            topicSelect.addEventListener('change', (e) => {
-                this.onTopicChange(e.target.value);
-            });
-        }
-        
-        // Subtopic-Select Event
-        const subtopicSelect = document.getElementById('subtopic-select');
-        if (subtopicSelect) {
-            subtopicSelect.addEventListener('change', (e) => {
-                this.taskGenerationState.subtopic = e.target.value || null;
-                this.updateSelectionPreview();
-            });
-        }
+        // Befülle das Themen-Dropdown mit Fuzzy-Suche
+        // Mehrfache Initialisierungsversuche für verschiedene Ladezeiten
+        this.initTopicSearch();
+        setTimeout(() => this.initTopicSearch(), 100);
+        setTimeout(() => this.initTopicSearch(), 500);
+        setTimeout(() => this.initTopicSearch(), 1000);
         
         // Special Wishes Input
         const wishesInput = document.getElementById('special-wishes-input');
@@ -3527,47 +5372,664 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             });
         }
         
-        // Task Type Dropdown
-        const taskTypeSelect = document.getElementById('task-type-select');
-        if (taskTypeSelect) {
-            taskTypeSelect.addEventListener('change', (e) => {
-                this.taskGenerationState.taskType = e.target.value || null;
-                this.updateSelectionPreview();
-            });
-        }
-        
-        // Difficulty Dropdown
-        const difficultySelect = document.getElementById('difficulty-select');
-        if (difficultySelect) {
-            difficultySelect.addEventListener('change', (e) => {
-                this.taskGenerationState.difficulty = e.target.value || null;
-                this.updateSelectionPreview();
-            });
-        }
+        // Initialisiere Custom-Dropdowns (Aufgabentyp, Schwierigkeit, Unterthema)
+        this.initCustomDropdowns();
         
         // Initiale Preview
         this.updateSelectionPreview();
     }
     
     /**
-     * Befüllt das Themen-Dropdown aus topic-data.js
+     * Initialisiert die Custom-Dropdowns (Aufgabentyp, Schwierigkeit, Unterthema)
+     */
+    initCustomDropdowns() {
+        // Task Type Dropdown
+        this.setupCustomDropdown({
+            wrapperId: 'task-type-dropdown-wrapper',
+            triggerId: 'task-type-trigger',
+            listId: 'task-type-dropdown-list',
+            hiddenInputId: 'task-type-select',
+            placeholder: '-- Aufgabentyp wählen --',
+            onSelect: (value) => {
+                this.taskGenerationState.taskType = value || null;
+                this.updateSelectionPreview();
+            }
+        });
+        
+        // Difficulty Dropdown
+        this.setupCustomDropdown({
+            wrapperId: 'difficulty-dropdown-wrapper',
+            triggerId: 'difficulty-trigger',
+            listId: 'difficulty-dropdown-list',
+            hiddenInputId: 'difficulty-select',
+            placeholder: '-- Schwierigkeit wählen --',
+            onSelect: (value) => {
+                this.taskGenerationState.difficulty = value || null;
+                this.updateSelectionPreview();
+            }
+        });
+        
+        // Subtopic Dropdown (wird dynamisch befüllt)
+        this.setupCustomDropdown({
+            wrapperId: 'subtopic-dropdown-wrapper',
+            triggerId: 'subtopic-trigger',
+            listId: 'subtopic-dropdown-list',
+            hiddenInputId: 'subtopic-select',
+            placeholder: '-- Optional: Unterthema wählen --',
+            onSelect: (value) => {
+                this.taskGenerationState.subtopic = value || null;
+                this.updateSelectionPreview();
+            }
+        });
+        
+        // Globaler Click-Handler zum Schließen aller Dropdowns
+        document.addEventListener('click', (e) => {
+            const dropdowns = document.querySelectorAll('.custom-dropdown.open');
+            dropdowns.forEach(dropdown => {
+                if (!dropdown.contains(e.target)) {
+                    dropdown.classList.remove('open');
+                    const list = dropdown.querySelector('.custom-dropdown-list');
+                    if (list) list.classList.remove('visible');
+                }
+            });
+        });
+    }
+    
+    /**
+     * Richtet ein einzelnes Custom-Dropdown ein
+     */
+    setupCustomDropdown({ wrapperId, triggerId, listId, hiddenInputId, placeholder, onSelect }) {
+        const wrapper = document.getElementById(wrapperId);
+        const trigger = document.getElementById(triggerId);
+        const list = document.getElementById(listId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        
+        if (!wrapper || !trigger || !list) {
+            console.warn(`[CustomDropdown] Missing elements for ${wrapperId}`);
+            return;
+        }
+        
+        // Toggle dropdown on trigger click
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Schließe andere offene Dropdowns
+            document.querySelectorAll('.custom-dropdown.open').forEach(dd => {
+                if (dd !== wrapper) {
+                    dd.classList.remove('open');
+                    dd.querySelector('.custom-dropdown-list')?.classList.remove('visible');
+                }
+            });
+            
+            // Toggle dieses Dropdown
+            const isOpen = wrapper.classList.contains('open');
+            if (isOpen) {
+                wrapper.classList.remove('open');
+                list.classList.remove('visible');
+            } else {
+                wrapper.classList.add('open');
+                list.classList.add('visible');
+            }
+        });
+        
+        // Handle item selection
+        list.addEventListener('click', (e) => {
+            const item = e.target.closest('.custom-dropdown-item');
+            if (!item) return;
+            
+            const value = item.dataset.value;
+            const text = item.querySelector('.dropdown-item-text')?.textContent || item.textContent;
+            
+            // Update hidden input
+            if (hiddenInput) {
+                hiddenInput.value = value;
+            }
+            
+            // Update trigger text
+            const triggerText = trigger.querySelector('.dropdown-trigger-text');
+            if (triggerText) {
+                triggerText.textContent = text;
+                triggerText.classList.remove('placeholder');
+            }
+            
+            // Update selected state
+            list.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            
+            // Close dropdown
+            wrapper.classList.remove('open');
+            list.classList.remove('visible');
+            
+            // Callback
+            if (onSelect) onSelect(value);
+        });
+        
+        // Keyboard navigation
+        trigger.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                trigger.click();
+            } else if (e.key === 'Escape') {
+                wrapper.classList.remove('open');
+                list.classList.remove('visible');
+            }
+        });
+    }
+    
+    /**
+     * Berechnet die Levenshtein-Distanz zwischen zwei Strings (für Fuzzy-Matching)
+     * @param {string} a - Erster String
+     * @param {string} b - Zweiter String
+     * @returns {number} - Distanz (niedrigerer Wert = ähnlicher)
+     */
+    levenshteinDistance(a, b) {
+        const matrix = [];
+        const aLen = a.length;
+        const bLen = b.length;
+        
+        if (aLen === 0) return bLen;
+        if (bLen === 0) return aLen;
+        
+        for (let i = 0; i <= bLen; i++) {
+            matrix[i] = [i];
+        }
+        for (let j = 0; j <= aLen; j++) {
+            matrix[0][j] = j;
+        }
+        
+        for (let i = 1; i <= bLen; i++) {
+            for (let j = 1; j <= aLen; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // Substitution
+                        matrix[i][j - 1] + 1,     // Insertion
+                        matrix[i - 1][j] + 1      // Deletion
+                    );
+                }
+            }
+        }
+        
+        return matrix[bLen][aLen];
+    }
+    
+    /**
+     * Fuzzy-Match: Prüft ob query ähnlich zu target ist
+     * Balanciert zwischen Tippfehler-Toleranz und Präzision
+     * @param {string} query - Suchanfrage
+     * @param {string} target - Zu durchsuchendes Ziel
+     * @returns {object} - { matches: boolean, score: number, matchType: string }
+     */
+    fuzzyMatch(query, target) {
+        const q = query.toLowerCase().trim();
+        const t = target.toLowerCase();
+        
+        if (q.length === 0) {
+            return { matches: true, score: 0, matchType: 'all' };
+        }
+        
+        // Exakte Übereinstimmung
+        if (t === q) {
+            return { matches: true, score: 0, matchType: 'exact' };
+        }
+        
+        // Beginnt mit Anfrage
+        if (t.startsWith(q)) {
+            return { matches: true, score: 1, matchType: 'prefix' };
+        }
+        
+        // Enthält Anfrage
+        if (t.includes(q)) {
+            return { matches: true, score: 2, matchType: 'contains' };
+        }
+        
+        // Wortbasiertes Matching: Jedes Wort im Target prüfen (vor Levenshtein)
+        const words = t.split(/\s+/);
+        for (const word of words) {
+            if (word.startsWith(q)) {
+                return { matches: true, score: 1.5, matchType: 'word-prefix' };
+            }
+            if (word.includes(q)) {
+                return { matches: true, score: 2.5, matchType: 'word-contains' };
+            }
+        }
+        
+        // Bei sehr kurzen Queries (1-2 Zeichen): Kein Fuzzy-Matching mehr
+        // Nur exakte/prefix/contains Matches sind präzise genug
+        if (q.length <= 2) {
+            return { matches: false, score: Infinity, matchType: 'none' };
+        }
+        
+        // Berechne maximale erlaubte Distanz basierend auf Query-Länge
+        // Strenger als vorher: ca. 25-30% Fehlerrate erlaubt
+        let maxDistance;
+        if (q.length <= 4) {
+            maxDistance = 1;  // 3-4 Zeichen: max 1 Fehler (25-33%)
+        } else if (q.length <= 7) {
+            maxDistance = 2;  // 5-7 Zeichen: max 2 Fehler (28-40%)
+        } else {
+            maxDistance = Math.floor(q.length * 0.3);  // 8+ Zeichen: max 30%
+        }
+        
+        // Teilstring-Fuzzy: Prüfe ob Anfrage ähnlich zu Beginn des Targets ist
+        const targetPrefix = t.substring(0, Math.min(q.length + 1, t.length));
+        const prefixDistance = this.levenshteinDistance(q, targetPrefix);
+        
+        if (prefixDistance <= maxDistance) {
+            return { matches: true, score: 3 + prefixDistance, matchType: 'fuzzy-prefix' };
+        }
+        
+        // Wortbasiertes Fuzzy-Matching
+        for (const word of words) {
+            // Wort-Prefix Fuzzy: Prüfe Anfang des Wortes
+            if (word.length >= q.length - 1) {
+                const wordPrefix = word.substring(0, Math.min(q.length + 1, word.length));
+                const wordPrefixDist = this.levenshteinDistance(q, wordPrefix);
+                if (wordPrefixDist <= maxDistance) {
+                    return { matches: true, score: 4 + wordPrefixDist, matchType: 'word-prefix-fuzzy' };
+                }
+            }
+            
+            // Volles Wort Fuzzy (nur wenn Wortlängen ähnlich)
+            const lengthDiff = Math.abs(word.length - q.length);
+            if (lengthDiff <= maxDistance) {
+                const wordDistance = this.levenshteinDistance(q, word);
+                if (wordDistance <= maxDistance) {
+                    return { matches: true, score: 5 + wordDistance, matchType: 'word-fuzzy' };
+                }
+            }
+        }
+        
+        // Vollständiges Target Fuzzy (nur sinnvoll wenn Längen ähnlich)
+        const targetLengthDiff = Math.abs(t.length - q.length);
+        if (targetLengthDiff <= maxDistance + 2) {
+            const distance = this.levenshteinDistance(q, t);
+            if (distance <= maxDistance) {
+                return { matches: true, score: 6 + distance, matchType: 'fuzzy' };
+            }
+        }
+        
+        return { matches: false, score: Infinity, matchType: 'none' };
+    }
+    
+    /**
+     * Initialisiert die Themen-Suche mit Fuzzy-Matching
+     */
+    initTopicSearch() {
+        // Verhindere doppelte Initialisierung
+        if (this.topicSearchState && this.topicSearchState.initialized) {
+            return;
+        }
+        
+        const searchInput = document.getElementById('topic-search-input');
+        const dropdownList = document.getElementById('topic-dropdown-list');
+        const clearBtn = document.getElementById('topic-clear-btn');
+        const hiddenInput = document.getElementById('topic-select-value');
+        
+        console.log('[TopicSearch] Initializing...', { searchInput: !!searchInput, dropdownList: !!dropdownList, MATH_TOPICS: !!window.MATH_TOPICS });
+        
+        if (!searchInput || !dropdownList) {
+            console.warn('[TopicSearch] Missing DOM elements');
+            return;
+        }
+        
+        if (typeof window.MATH_TOPICS === 'undefined' || !window.MATH_TOPICS) {
+            console.warn('[TopicSearch] MATH_TOPICS not loaded yet');
+            return;
+        }
+        
+        // Bereite Themen-Liste vor
+        this.topicSearchState.allTopics = Object.entries(window.MATH_TOPICS).map(([id, topic]) => ({
+            id,
+            name: topic.name,
+            icon: topic.icon
+        }));
+        
+        console.log('[TopicSearch] Loaded topics:', this.topicSearchState.allTopics.length);
+        
+        // Initiale Befüllung des Dropdowns
+        this.filterTopicDropdown('');
+        
+        // Input Event: Filtere bei Texteingabe
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            console.log('[TopicSearch] Input:', query);
+            this.filterTopicDropdown(query);
+            this.showTopicDropdown();
+        });
+        
+        // Focus Event: Zeige Dropdown
+        searchInput.addEventListener('focus', () => {
+            console.log('[TopicSearch] Focus');
+            this.filterTopicDropdown(searchInput.value);
+            this.showTopicDropdown();
+        });
+        
+        // Click auf Input: Zeige Dropdown auch bei Click
+        searchInput.addEventListener('click', () => {
+            console.log('[TopicSearch] Click');
+            this.filterTopicDropdown(searchInput.value);
+            this.showTopicDropdown();
+        });
+        
+        // Blur Event: Verstecke Dropdown (mit längerer Verzögerung für Klicks)
+        searchInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (!this.topicSearchState.preventClose) {
+                    this.hideTopicDropdown();
+                }
+                this.topicSearchState.preventClose = false;
+            }, 200);
+        });
+        
+        // Keyboard Navigation
+        searchInput.addEventListener('keydown', (e) => {
+            this.handleTopicSearchKeydown(e);
+        });
+        
+        // Clear Button
+        if (clearBtn) {
+            clearBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.topicSearchState.preventClose = true;
+            });
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.clearTopicSelection();
+            });
+        }
+        
+        // Click outside schließt Dropdown
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.topic-search-wrapper')) {
+                this.hideTopicDropdown();
+            }
+        });
+        
+        // Markiere als initialisiert
+        this.topicSearchState.initialized = true;
+        console.log('[TopicSearch] Initialization complete');
+    }
+    
+    /**
+     * Filtert das Themen-Dropdown basierend auf der Suchanfrage
+     * @param {string} query - Suchanfrage
+     */
+    filterTopicDropdown(query) {
+        const dropdownList = document.getElementById('topic-dropdown-list');
+        if (!dropdownList) {
+            console.warn('[TopicSearch] filterTopicDropdown: dropdown list not found');
+            return;
+        }
+        
+        if (!this.topicSearchState || !this.topicSearchState.allTopics) {
+            console.warn('[TopicSearch] filterTopicDropdown: topicSearchState not initialized');
+            return;
+        }
+        
+        dropdownList.innerHTML = '';
+        this.topicSearchState.highlightedIndex = -1;
+        
+        const q = (query || '').trim();
+        let results = [];
+        
+        console.log('[TopicSearch] Filtering with query:', q, 'Topics count:', this.topicSearchState.allTopics.length);
+        
+        if (q === '') {
+            // Keine Eingabe: Zeige alle Themen
+            results = this.topicSearchState.allTopics.map(topic => ({
+                ...topic,
+                score: 0,
+                matchType: 'all'
+            }));
+        } else {
+            // Fuzzy-Matching
+            for (const topic of this.topicSearchState.allTopics) {
+                const match = this.fuzzyMatch(q, topic.name);
+                if (match.matches) {
+                    results.push({
+                        ...topic,
+                        score: match.score,
+                        matchType: match.matchType
+                    });
+                }
+            }
+            
+            // Sortiere nach Score (niedrigster = beste Übereinstimmung)
+            results.sort((a, b) => a.score - b.score);
+        }
+        
+        console.log('[TopicSearch] Results found:', results.length);
+        
+        if (results.length === 0) {
+            dropdownList.innerHTML = `
+                <div class="topic-dropdown-empty">
+                    <i class="fas fa-search"></i>
+                    Kein Thema gefunden für "${q}"
+                </div>
+            `;
+            return;
+        }
+        
+        // Render Ergebnisse
+        results.forEach((topic, index) => {
+            const item = document.createElement('div');
+            item.className = 'topic-dropdown-item';
+            item.dataset.topicId = topic.id;
+            item.dataset.index = index;
+            
+            // Markiere wenn aktuell ausgewählt
+            if (this.taskGenerationState.topic === topic.id) {
+                item.classList.add('selected');
+            }
+            
+            // Highlight matched text in name
+            let displayName = topic.name;
+            if (q && topic.matchType !== 'all') {
+                displayName = this.highlightMatch(topic.name, q);
+            }
+            
+            item.innerHTML = `
+                <i class="fas ${topic.icon || 'fa-book'}"></i>
+                <span class="topic-dropdown-item-name">${displayName}</span>
+                ${topic.matchType === 'fuzzy' || topic.matchType === 'fuzzy-prefix' || topic.matchType === 'word-fuzzy' 
+                    ? '<span class="topic-dropdown-item-match">ähnlich</span>' 
+                    : ''}
+            `;
+            
+            // Click Events - verhindere blur-close
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.topicSearchState.preventClose = true;
+            });
+            
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[TopicSearch] Selected:', topic.name);
+                this.selectTopic(topic.id, topic.name);
+            });
+            
+            dropdownList.appendChild(item);
+        });
+    }
+    
+    /**
+     * Hebt den übereinstimmenden Text hervor
+     * @param {string} text - Originaltext
+     * @param {string} query - Suchanfrage
+     * @returns {string} - HTML mit Hervorhebung
+     */
+    highlightMatch(text, query) {
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const index = lowerText.indexOf(lowerQuery);
+        
+        if (index === -1) {
+            // Fuzzy match - keine direkte Übereinstimmung, zeige Original
+            return text;
+        }
+        
+        const before = text.substring(0, index);
+        const match = text.substring(index, index + query.length);
+        const after = text.substring(index + query.length);
+        
+        return `${before}<span class="topic-match-highlight">${match}</span>${after}`;
+    }
+    
+    /**
+     * Zeigt das Themen-Dropdown an
+     */
+    showTopicDropdown() {
+        const dropdownList = document.getElementById('topic-dropdown-list');
+        const wrapper = document.querySelector('.topic-search-wrapper');
+        if (dropdownList) {
+            dropdownList.classList.add('visible');
+            if (wrapper) wrapper.classList.add('dropdown-open');
+            this.topicSearchState.isOpen = true;
+            console.log('[TopicSearch] Dropdown shown, items:', dropdownList.children.length);
+        }
+    }
+    
+    /**
+     * Versteckt das Themen-Dropdown
+     */
+    hideTopicDropdown() {
+        const dropdownList = document.getElementById('topic-dropdown-list');
+        const wrapper = document.querySelector('.topic-search-wrapper');
+        if (dropdownList && this.topicSearchState.isOpen) {
+            dropdownList.classList.remove('visible');
+            if (wrapper) wrapper.classList.remove('dropdown-open');
+            this.topicSearchState.isOpen = false;
+            this.topicSearchState.highlightedIndex = -1;
+            console.log('[TopicSearch] Dropdown hidden');
+        }
+    }
+    
+    /**
+     * Keyboard-Navigation im Dropdown
+     * @param {KeyboardEvent} e
+     */
+    handleTopicSearchKeydown(e) {
+        const dropdownList = document.getElementById('topic-dropdown-list');
+        if (!dropdownList || !this.topicSearchState.isOpen) return;
+        
+        const items = dropdownList.querySelectorAll('.topic-dropdown-item');
+        if (items.length === 0) return;
+        
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                this.topicSearchState.highlightedIndex = Math.min(
+                    this.topicSearchState.highlightedIndex + 1,
+                    items.length - 1
+                );
+                this.updateTopicHighlight(items);
+                break;
+                
+            case 'ArrowUp':
+                e.preventDefault();
+                this.topicSearchState.highlightedIndex = Math.max(
+                    this.topicSearchState.highlightedIndex - 1,
+                    0
+                );
+                this.updateTopicHighlight(items);
+                break;
+                
+            case 'Enter':
+                e.preventDefault();
+                if (this.topicSearchState.highlightedIndex >= 0) {
+                    const selectedItem = items[this.topicSearchState.highlightedIndex];
+                    const topicId = selectedItem.dataset.topicId;
+                    const topicName = selectedItem.querySelector('.topic-dropdown-item-name').textContent;
+                    this.selectTopic(topicId, topicName);
+                }
+                break;
+                
+            case 'Escape':
+                e.preventDefault();
+                this.hideTopicDropdown();
+                break;
+        }
+    }
+    
+    /**
+     * Aktualisiert die visuelle Hervorhebung im Dropdown
+     * @param {NodeList} items
+     */
+    updateTopicHighlight(items) {
+        items.forEach((item, index) => {
+            if (index === this.topicSearchState.highlightedIndex) {
+                item.classList.add('highlighted');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('highlighted');
+            }
+        });
+    }
+    
+    /**
+     * Wählt ein Thema aus
+     * @param {string} topicId
+     * @param {string} topicName
+     */
+    selectTopic(topicId, topicName) {
+        const searchInput = document.getElementById('topic-search-input');
+        const hiddenInput = document.getElementById('topic-select-value');
+        const wrapper = document.querySelector('.topic-search-wrapper');
+        
+        if (searchInput) {
+            searchInput.value = topicName;
+            searchInput.classList.add('has-selection');
+        }
+        if (hiddenInput) {
+            hiddenInput.value = topicId;
+        }
+        if (wrapper) {
+            wrapper.classList.add('has-selection');
+        }
+        
+        this.hideTopicDropdown();
+        this.onTopicChange(topicId);
+    }
+    
+    /**
+     * Löscht die Themenauswahl
+     */
+    clearTopicSelection() {
+        const searchInput = document.getElementById('topic-search-input');
+        const hiddenInput = document.getElementById('topic-select-value');
+        const wrapper = document.querySelector('.topic-search-wrapper');
+        
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.classList.remove('has-selection');
+            searchInput.focus();
+        }
+        if (hiddenInput) {
+            hiddenInput.value = '';
+        }
+        if (wrapper) {
+            wrapper.classList.remove('has-selection');
+        }
+        
+        this.onTopicChange(null);
+        this.filterTopicDropdown('');
+        this.showTopicDropdown();
+    }
+    
+    /**
+     * Legacy-Funktion: Befüllt das Themen-Dropdown (für Abwärtskompatibilität)
+     * @deprecated Verwende initTopicSearch() stattdessen
      */
     populateTopicDropdown() {
-        const topicSelect = document.getElementById('topic-select');
-        if (!topicSelect || typeof window.MATH_TOPICS === 'undefined') return;
-        
-        // Behalte die erste "Auswahl"-Option
-        const firstOption = topicSelect.querySelector('option');
-        topicSelect.innerHTML = '';
-        topicSelect.appendChild(firstOption);
-        
-        // Füge alle Themen hinzu
-        Object.entries(window.MATH_TOPICS).forEach(([id, topic]) => {
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = topic.name;
-            topicSelect.appendChild(option);
-        });
+        // Diese Funktion wird durch initTopicSearch() ersetzt
+        // Bleibt für Abwärtskompatibilität falls von anderen Stellen aufgerufen
+        this.initTopicSearch();
     }
     
     /**
@@ -3578,9 +6040,30 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
         this.taskGenerationState.subtopic = null;
         
         const subtopicWrapper = document.getElementById('subtopic-wrapper');
-        const subtopicSelect = document.getElementById('subtopic-select');
+        const subtopicDropdownWrapper = document.getElementById('subtopic-dropdown-wrapper');
+        const subtopicList = document.getElementById('subtopic-dropdown-list');
+        const subtopicTrigger = document.getElementById('subtopic-trigger');
+        const subtopicHidden = document.getElementById('subtopic-select');
         
-        if (!subtopicWrapper || !subtopicSelect) return;
+        if (!subtopicWrapper || !subtopicList) return;
+        
+        // Reset subtopic selection
+        if (subtopicTrigger) {
+            const triggerText = subtopicTrigger.querySelector('.dropdown-trigger-text');
+            if (triggerText) {
+                triggerText.textContent = '-- Optional: Unterthema wählen --';
+                triggerText.classList.add('placeholder');
+            }
+        }
+        if (subtopicHidden) {
+            subtopicHidden.value = '';
+        }
+        if (subtopicDropdownWrapper) {
+            subtopicDropdownWrapper.classList.remove('open');
+        }
+        if (subtopicList) {
+            subtopicList.classList.remove('visible');
+        }
         
         if (!topicId || typeof window.MATH_TOPICS === 'undefined') {
             // Verstecke Unterthemen
@@ -3594,13 +6077,45 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             return;
         }
         
-        // Befülle Unterthemen
-        subtopicSelect.innerHTML = '<option value="">-- Optional: Unterthema wählen --</option>';
+        // Befülle Unterthemen als Custom-Dropdown-Items
+        subtopicList.innerHTML = '';
         Object.entries(topic.subtopics).forEach(([id, name]) => {
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = name;
-            subtopicSelect.appendChild(option);
+            const item = document.createElement('div');
+            item.className = 'custom-dropdown-item';
+            item.dataset.value = id;
+            item.innerHTML = `
+                <i class="fas fa-bookmark"></i>
+                <span class="dropdown-item-text">${name}</span>
+            `;
+            
+            // Event-Listener direkt auf das Item setzen
+            item.addEventListener('click', () => {
+                // Update hidden input
+                if (subtopicHidden) subtopicHidden.value = id;
+                
+                // Update trigger text
+                if (subtopicTrigger) {
+                    const triggerText = subtopicTrigger.querySelector('.dropdown-trigger-text');
+                    if (triggerText) {
+                        triggerText.textContent = name;
+                        triggerText.classList.remove('placeholder');
+                    }
+                }
+                
+                // Update selected state
+                subtopicList.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+                
+                // Close dropdown
+                if (subtopicDropdownWrapper) subtopicDropdownWrapper.classList.remove('open');
+                subtopicList.classList.remove('visible');
+                
+                // Update state
+                this.taskGenerationState.subtopic = id;
+                this.updateSelectionPreview();
+            });
+            
+            subtopicList.appendChild(item);
         });
         
         // Zeige Unterthemen mit Animation
@@ -3688,27 +6203,54 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
             specialWishes: ''
         };
 
-        // UI zurücksetzen
-        const topicSelect = document.getElementById('topic-select');
-        if (topicSelect) topicSelect.value = '';
+        // Topic Search zurücksetzen
+        const topicSearchInput = document.getElementById('topic-search-input');
+        const topicHiddenInput = document.getElementById('topic-select-value');
+        const topicWrapper = document.querySelector('.topic-search-wrapper');
+        if (topicSearchInput) {
+            topicSearchInput.value = '';
+            topicSearchInput.classList.remove('has-selection');
+        }
+        if (topicHiddenInput) topicHiddenInput.value = '';
+        if (topicWrapper) topicWrapper.classList.remove('has-selection');
 
-        const subtopicSelect = document.getElementById('subtopic-select');
-        if (subtopicSelect) subtopicSelect.value = '';
-
+        // Subtopic Wrapper verstecken
         const subtopicWrapper = document.getElementById('subtopic-wrapper');
         if (subtopicWrapper) subtopicWrapper.classList.remove('visible');
 
+        // Wishes Input zurücksetzen
         const wishesInput = document.getElementById('special-wishes-input');
         if (wishesInput) wishesInput.value = '';
 
-        // Reset new dropdowns
-        const taskTypeSelect = document.getElementById('task-type-select');
-        if (taskTypeSelect) taskTypeSelect.value = '';
-
-        const difficultySelect = document.getElementById('difficulty-select');
-        if (difficultySelect) difficultySelect.value = '';
+        // Custom Dropdowns zurücksetzen
+        this.resetCustomDropdown('task-type-dropdown-wrapper', 'task-type-trigger', 'task-type-select', '-- Aufgabentyp wählen --');
+        this.resetCustomDropdown('difficulty-dropdown-wrapper', 'difficulty-trigger', 'difficulty-select', '-- Schwierigkeit wählen --');
+        this.resetCustomDropdown('subtopic-dropdown-wrapper', 'subtopic-trigger', 'subtopic-select', '-- Optional: Unterthema wählen --');
         
         this.updateSelectionPreview();
+    }
+    
+    /**
+     * Setzt ein Custom-Dropdown zurück
+     */
+    resetCustomDropdown(wrapperId, triggerId, hiddenInputId, placeholder) {
+        const wrapper = document.getElementById(wrapperId);
+        const trigger = document.getElementById(triggerId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        
+        if (trigger) {
+            const triggerText = trigger.querySelector('.dropdown-trigger-text');
+            if (triggerText) {
+                triggerText.textContent = placeholder;
+                triggerText.classList.add('placeholder');
+            }
+        }
+        if (hiddenInput) hiddenInput.value = '';
+        if (wrapper) {
+            wrapper.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+        }
     }
     
     /**
@@ -3723,11 +6265,7 @@ Wenn farbige Darstellung nicht möglich ist, behalte die Textlabels in eckigen K
     }
 
     async generateTask(forceRandom = false) {
-        if (!this.apiKey) {
-            this.showNotification('Bitte konfiguriere zuerst deinen API-Schlüssel im Profil-Tab.', 'warning');
-            document.querySelector('[data-tab="user-profile"]').click();
-            return;
-        }
+        // API wird über Backend-Proxy verwaltet
 
         this.showLoading(true);
 
@@ -4126,78 +6664,28 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             };
         }
 
-        const requestBody = {
+        // Messages für den Proxy vorbereiten
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            userMessage
+        ];
+
+        // API-Aufruf über Backend-Proxy
+        const data = await this.callAIProxy({
+            provider: this.apiProvider,
+            messages: messages,
             model: model,
-            messages: this.apiProvider === 'anthropic' ? [userMessage] : [
-                {
-                    role: 'system',
-                    content: systemPrompt
-                },
-                userMessage
-            ],
+            max_tokens: 2000,
             temperature: 0.7
-        };
-
-        if (this.apiProvider === 'openai') {
-            requestBody.max_completion_tokens = 2000;
-        } else {
-            requestBody.max_tokens = 2000;
-        }
-
-        // Anthropic-spezifische Parameter
-        if (this.apiProvider === 'anthropic') {
-            requestBody.system = systemPrompt;
-        }
-
-        const apiUrl = this.apiProvider === 'openai' 
-            ? 'https://api.openai.com/v1/chat/completions'
-            : 'https://api.anthropic.com/v1/messages';
-
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-
-        if (this.apiProvider === 'openai') {
-            headers['Authorization'] = `Bearer ${this.apiKey}`;
-        } else {
-            headers['x-api-key'] = this.apiKey;
-            headers['anthropic-version'] = '2023-06-01';
-        }
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(requestBody)
         });
 
-        if (!response.ok) {
-            // Versuche, detaillierte Fehlerinformationen zu erhalten
-            let errorDetails = '';
-            try {
-                const errorData = await response.json();
-                console.error('API Error Details:', errorData);
-                errorDetails = errorData.error?.message || JSON.stringify(errorData);
-            } catch (e) {
-                errorDetails = response.statusText;
-            }
-            
-            throw new Error(`API-Fehler (${response.status}): ${errorDetails}`);
-        }
-
-        const data = await response.json();
-        console.log('API Response:', data);
+        console.log('API Response via Proxy:', data);
         
-        if (this.apiProvider === 'openai') {
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                throw new Error('Ungültige API-Antwort: ' + JSON.stringify(data));
-            }
-            return data.choices[0].message.content;
-        } else {
-            if (!data.content || !data.content[0]) {
-                throw new Error('Ungültige API-Antwort: ' + JSON.stringify(data));
-            }
-            return data.content[0].text;
+        // Response ist immer im OpenAI-Format (Proxy konvertiert Anthropic)
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error('Ungültige API-Antwort: ' + JSON.stringify(data));
         }
+        return data.choices[0].message.content;
     }
 
     displayResults(content, isTask = false) {
@@ -4207,6 +6695,8 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         // Speichere die aktuelle Aufgabe für spätere Referenz
         if (isTask) {
             this.currentTask = content;
+            // Sidebar-Widgets aktualisieren
+            this.recordTaskGenerated();
         }
         
         let interactionHTML = '';
@@ -4330,15 +6820,15 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
                     </div>
                     
                     <div class="interaction-actions">
-                        <button class="btn btn-primary" id="submit-solution">
+                        <button class="btn btn-primary" id="submit-solution" data-action="submit">
                             <i class="fas fa-check-circle"></i>
                             Lösung überprüfen
                         </button>
-                        <button class="btn btn-secondary" id="request-hint">
+                        <button class="btn btn-secondary" id="request-hint" data-action="hint">
                             <i class="fas fa-lightbulb"></i>
                             Hints anzeigen
                         </button>
-                        <button class="btn btn-secondary" id="request-optimal" disabled>
+                        <button class="btn btn-secondary" id="request-optimal" data-action="optimal" disabled>
                             <i class="fas fa-rocket"></i>
                             Optimaler Lösungsweg
                         </button>
@@ -5047,6 +7537,99 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         this.setupSolutionImageUpload();
 
         this.updateSolutionActionButtons();
+        
+        // Sticky Button Bar Detection
+        this.setupStickyButtonBar();
+    }
+    
+    /**
+     * Richtet die Sticky Button-Bar ein
+     * EINFACHE LÖSUNG: Prüft ob Original-Bar sichtbar, wenn nicht -> fixierte Bar zeigen
+     */
+    setupStickyButtonBar() {
+        const actionsBar = document.querySelector('.interaction-actions');
+        if (!actionsBar) return;
+        
+        // Der scrollbare Container ist .main-content
+        const scrollContainer = document.querySelector('.main-content');
+        if (!scrollContainer) return;
+        
+        // Entferne alte fixierte Bar falls vorhanden
+        const existingFixedBar = document.querySelector('.interaction-actions-fixed');
+        if (existingFixedBar) {
+            existingFixedBar.remove();
+        }
+        
+        // Erstelle eine fixierte Kopie der Button-Bar
+        const fixedBar = actionsBar.cloneNode(true);
+        fixedBar.className = 'interaction-actions interaction-actions-fixed';
+        fixedBar.style.cssText = `
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 900px;
+            width: calc(100% - 350px);
+            z-index: 1000;
+        `;
+        document.body.appendChild(fixedBar);
+        
+        // Event-Listener für die fixierte Bar kopieren (über data-Attribute)
+        const fixedSubmitBtn = fixedBar.querySelector('[data-action="submit"]');
+        const fixedHintBtn = fixedBar.querySelector('[data-action="hint"]');
+        const fixedOptimalBtn = fixedBar.querySelector('[data-action="optimal"]');
+        
+        if (fixedSubmitBtn) {
+            fixedSubmitBtn.removeAttribute('id'); // Verhindere doppelte IDs
+            fixedSubmitBtn.addEventListener('click', () => this.submitSolution());
+        }
+        if (fixedHintBtn) {
+            fixedHintBtn.removeAttribute('id');
+            fixedHintBtn.addEventListener('click', () => this.toggleHints());
+        }
+        if (fixedOptimalBtn) {
+            fixedOptimalBtn.removeAttribute('id');
+            fixedOptimalBtn.addEventListener('click', () => this.requestOptimalSolution());
+        }
+        
+        // Speichere Referenz für Button-Updates
+        this.fixedActionsBar = fixedBar;
+        
+        // EINFACHER CHECK: Ist die Original-Bar im sichtbaren Bereich?
+        const checkStickyState = () => {
+            const barRect = actionsBar.getBoundingClientRect();
+            
+            // Die Bar sollte fixiert werden wenn sie komplett über den oberen Bildschirmrand gescrollt ist
+            // ODER wenn sie unter dem sichtbaren Bereich des scrollContainers liegt
+            const isAboveViewport = barRect.bottom < 0;
+            
+            // Alternative: Prüfe relativ zum Container
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const isAboveContainer = barRect.bottom < containerRect.top;
+            
+            const shouldBeFixed = isAboveViewport || isAboveContainer;
+            
+            if (shouldBeFixed) {
+                // Berechne die Position dynamisch
+                const sidebarWidth = document.querySelector('.sidebar')?.offsetWidth || 280;
+                fixedBar.style.left = (sidebarWidth + (window.innerWidth - sidebarWidth) / 2) + 'px';
+                fixedBar.style.width = Math.min(900, window.innerWidth - sidebarWidth - 48) + 'px';
+                fixedBar.style.display = 'flex';
+                actionsBar.style.opacity = '0';
+            } else {
+                fixedBar.style.display = 'none';
+                actionsBar.style.opacity = '1';
+            }
+        };
+        
+        // Scroll-Event auf BEIDEN Containern (window und .main-content)
+        scrollContainer.addEventListener('scroll', checkStickyState, { passive: true });
+        window.addEventListener('scroll', checkStickyState, { passive: true });
+        window.addEventListener('resize', checkStickyState, { passive: true });
+        
+        // Initial prüfen
+        setTimeout(checkStickyState, 100);
     }
     
     /**
@@ -5255,10 +7838,33 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             
             console.log('[submitSolution] Analysis response:', analysisResponse);
             
-            // Bestimme Erfolg basierend auf Fehlertypen
-            const hasErrors = analysisResponse.steps && analysisResponse.steps.some(
+            // Bestimme Erfolg basierend auf Aufgabentyp
+            let hasErrors;
+            const taskType = this.currentTaskContext?.taskType || 'berechnung';
+            
+            if (taskType === 'theorie') {
+                // Theorie-Aufgaben: Prüfe subTasks auf correctness
+                hasErrors = analysisResponse.subTasks && analysisResponse.subTasks.some(
+                    task => task.correctness && task.correctness !== 'correct'
+                );
+                // Oder direkt overallCorrect verwenden wenn vorhanden
+                if (analysisResponse.overallCorrect !== undefined) {
+                    hasErrors = !analysisResponse.overallCorrect;
+                }
+            } else {
+                // Berechnungen/Sachaufgaben: Prüfe steps auf errorType
+                hasErrors = analysisResponse.steps && analysisResponse.steps.some(
                 step => step.errorType && step.errorType !== 'none'
             );
+                // Bei Sachaufgaben: Auch fehlender Antwortsatz ist ein "Fehler"
+                if (taskType === 'sachaufgabe' && analysisResponse.answerSentence) {
+                    if (!analysisResponse.answerSentence.present || 
+                        analysisResponse.answerSentence.quality === 'missing') {
+                        hasErrors = true;
+                    }
+                }
+            }
+            
             const success = !hasErrors;
             const preparedHints = analysisResponse.hints || { level1: [], level2: [] };
             
@@ -5317,6 +7923,12 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
                 await this._processStrengthWeaknessTracking(analysisResponse, success);
             }
             
+            // Session-Statistiken aktualisieren
+            this.recordErrorsFromAnalysis(analysisResponse);
+            if (success) {
+                this.recordTaskSolved();
+            }
+            
             // Zeige strukturierte Feedback-Anzeige
             this.displayStructuredFeedback(analysisResponse, success);
             this.updateSolutionActionButtons();
@@ -5330,6 +7942,7 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
 
     /**
      * Zeigt die strukturierte Fehleranalyse an
+     * Routet basierend auf Aufgabentyp zur passenden Darstellung
      */
     displayStructuredFeedback(analysis, success) {
         const feedbackArea = document.getElementById('feedback-area');
@@ -5343,12 +7956,50 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         feedbackArea.style.display = 'block';
         feedbackContent.innerHTML = '';
         
-        // Status-Banner
+        // Nach der ersten Überprüfung: Eingabefelder ausblenden
+        // Da Korrekturen direkt an den Schritten gemacht werden, sind diese überflüssig
+        const solutionSection = document.querySelector('.solution-section');
+        const solutionImageSection = document.querySelector('.solution-image-section');
+        const sketchToggleBtn = document.getElementById('sketch-toggle-btn');
+        const drawingSection = document.getElementById('drawing-section');
+        
+        if (solutionSection) solutionSection.style.display = 'none';
+        if (solutionImageSection) solutionImageSection.style.display = 'none';
+        if (sketchToggleBtn) sketchToggleBtn.style.display = 'none';
+        if (drawingSection) drawingSection.style.display = 'none';
+        
+        // Aufgabentyp prüfen und entsprechend routen
+        const taskType = this.currentTaskContext?.taskType || 'berechnung';
+        console.log('[displayStructuredFeedback] Rendering für Aufgabentyp:', taskType);
+        
+        if (taskType === 'theorie') {
+            this._displayTheoryFeedback(feedbackContent, analysis, success);
+            return;
+        }
+        
+        // Status-Banner (für Berechnung und Sachaufgabe)
         const statusBanner = document.createElement('div');
         statusBanner.className = success ? 'feedback-status success' : 'feedback-status error';
+        
+        if (taskType === 'sachaufgabe') {
+            // Sachaufgaben-spezifische Status-Meldung
+            const hasAnswerSentenceIssue = analysis.answerSentence && 
+                (!analysis.answerSentence.present || analysis.answerSentence.quality !== 'complete');
+            
+            if (success && !hasAnswerSentenceIssue) {
+                statusBanner.innerHTML = '<i class="fas fa-check-circle"></i> <strong>Lösung korrekt!</strong> Rechnung und Antwortsatz stimmen.';
+            } else if (success && hasAnswerSentenceIssue) {
+                statusBanner.className = 'feedback-status warning';
+                statusBanner.innerHTML = '<i class="fas fa-exclamation-circle"></i> <strong>Fast richtig!</strong> Die Rechnung stimmt, aber prüfe den Antwortsatz.';
+            } else {
+                statusBanner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>Fehler gefunden</strong> - Prüfe die markierten Schritte.';
+            }
+        } else {
+            // Standard-Berechnung
         statusBanner.innerHTML = success 
             ? '<i class="fas fa-check-circle"></i> <strong>Lösung korrekt!</strong> Alle Schritte sind richtig.'
             : '<i class="fas fa-exclamation-triangle"></i> <strong>Fehler gefunden</strong> - Prüfe die markierten Schritte.';
+        }
         feedbackContent.appendChild(statusBanner);
 
         const hintState = this.solutionState.hintState || { prepared: { level1: [], level2: [] }, unlockedLevel: 0, popupOpen: false };
@@ -5419,18 +8070,29 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         }
         
         // Kurzes Feedback anzeigen (nach Steps)
-        if (analysis.feedback && analysis.feedback.summarySentence) {
+        // Bei korrekten Lösungen ein Standard-Feedback, wenn keins vorhanden
+        let feedbackText = analysis.feedback?.summarySentence;
+        if (!feedbackText && success) {
+            feedbackText = 'Ausgezeichnet! Dein Lösungsweg ist vollständig korrekt. Alle Schritte sind mathematisch richtig und gut nachvollziehbar.';
+        }
+        
+        if (feedbackText) {
             const feedbackSummary = document.createElement('div');
             feedbackSummary.className = 'feedback-summary-box';
-            // LaTeX im Feedback-Text mit Delimitern umgeben für MathJax-Rendering
-            const formattedFeedback = typeof wrapLatexInText === 'function' 
-                ? wrapLatexInText(analysis.feedback.summarySentence)
-                : analysis.feedback.summarySentence;
+            // LaTeX im Feedback für MathJax-Rendering wrappen
+            const formattedFeedback = typeof wrapLatexInFeedback === 'function' 
+                ? wrapLatexInFeedback(feedbackText)
+                : feedbackText;
             feedbackSummary.innerHTML = `
                 <i class="fas fa-comment-dots"></i>
                 <span>${formattedFeedback}</span>
             `;
             feedbackContent.appendChild(feedbackSummary);
+            
+            // MathJax für Feedback rendern
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([feedbackSummary]).catch(err => console.warn('MathJax error:', err));
+            }
         }
         
         // Ausführliches Feedback anzeigen (bei feedbackLevel="detailed")
@@ -5454,10 +8116,38 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
             feedbackContent.appendChild(uiContainer);
         }
         
+        // Antwortsatz-Feedback für Sachaufgaben
+        if (taskType === 'sachaufgabe' && analysis.answerSentence) {
+            const answerSentenceBox = this._renderAnswerSentenceFeedback(analysis.answerSentence);
+            feedbackContent.appendChild(answerSentenceBox);
+        }
+        
         // Zusammenfassung der Fehler (am Ende)
         if (!success) {
             const errorSummary = this.createErrorSummary(analysis.steps);
             feedbackContent.appendChild(errorSummary);
+            
+            // "Aufgabe Erklären" Button hinzufügen bei Fehlern
+            if (this.currentTask) {
+                const explainContainer = document.createElement('div');
+                explainContainer.className = 'explain-action-container';
+                explainContainer.style.cssText = 'margin-top: 20px; padding: 15px; background: var(--surface-2); border-radius: 8px; text-align: center;';
+                
+                const explainLabel = document.createElement('p');
+                explainLabel.style.cssText = 'margin: 0 0 10px 0; color: var(--text-secondary);';
+                explainLabel.textContent = 'Brauchst du eine ausführliche Erklärung dieser Aufgabe?';
+                explainContainer.appendChild(explainLabel);
+                
+                const explainBtn = document.createElement('button');
+                explainBtn.className = 'btn btn-primary';
+                explainBtn.innerHTML = '<i class="fas fa-question-circle"></i> Aufgabe erklären lassen';
+                explainBtn.addEventListener('click', () => {
+                    this.navigateToExplainTab(this.currentTask);
+                });
+                explainContainer.appendChild(explainBtn);
+                
+                feedbackContent.appendChild(explainContainer);
+            }
         }
         
         // MathJax rendern und dann Formeln klickbar machen
@@ -5478,6 +8168,352 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
                 window.GraphRenderer.makeFormulasClickable(feedbackContent);
             }
         }
+    }
+    
+    /**
+     * Zeigt Feedback für Theorie-Aufgaben an (optimiert)
+     * @private
+     */
+    _displayTheoryFeedback(feedbackContent, analysis, success) {
+        // Helper für LaTeX-Formatierung
+        const formatWithLatex = (text) => {
+            if (!text) return '';
+            return typeof wrapLatexInText === 'function' ? wrapLatexInText(text) : text;
+        };
+        
+        // Statistik berechnen
+        const stats = this._calculateTheoryStats(analysis.subTasks || []);
+        
+        // Kompakter Header mit Gesamtbewertung
+        const headerSection = document.createElement('div');
+        headerSection.className = 'theory-header-section';
+        
+        // Status-Banner
+        const statusBanner = document.createElement('div');
+        const assessment = analysis.overallAssessment || 'partial';
+        const statusConfig = {
+            excellent: { class: 'success', icon: 'check-circle', text: 'Ausgezeichnet!' },
+            good: { class: 'success', icon: 'check-circle', text: 'Gut gemacht!' },
+            partial: { class: 'warning', icon: 'exclamation-circle', text: 'Teilweise richtig' },
+            needs_work: { class: 'error', icon: 'exclamation-triangle', text: 'Verbesserung nötig' },
+            incorrect: { class: 'error', icon: 'times-circle', text: 'Überarbeitung erforderlich' }
+        }[assessment] || { class: 'warning', icon: 'question-circle', text: 'Prüfen' };
+        
+        statusBanner.className = `feedback-status ${statusConfig.class}`;
+        statusBanner.innerHTML = `<i class="fas fa-${statusConfig.icon}"></i> <strong>${statusConfig.text}</strong>`;
+        headerSection.appendChild(statusBanner);
+        
+        // Fortschrittsanzeige
+        if (stats.total > 0) {
+            const progressBar = document.createElement('div');
+            progressBar.className = 'theory-progress-bar';
+            const correctPercent = (stats.correct / stats.total) * 100;
+            const partialPercent = (stats.partial / stats.total) * 100;
+            
+            progressBar.innerHTML = `
+                <div class="progress-track">
+                    <div class="progress-fill correct" style="width: ${correctPercent}%"></div>
+                    <div class="progress-fill partial" style="width: ${partialPercent}%; left: ${correctPercent}%"></div>
+                </div>
+                <div class="progress-labels">
+                    <span class="label-correct"><i class="fas fa-check"></i> ${stats.correct}/${stats.total} richtig</span>
+                    ${stats.partial > 0 ? `<span class="label-partial"><i class="fas fa-minus"></i> ${stats.partial} teilweise</span>` : ''}
+                    ${stats.incorrect > 0 ? `<span class="label-incorrect"><i class="fas fa-times"></i> ${stats.incorrect} falsch</span>` : ''}
+                </div>
+            `;
+            headerSection.appendChild(progressBar);
+        }
+        
+        feedbackContent.appendChild(headerSection);
+        
+        // Hint-Button (falls verfügbar)
+        const hintState = this.solutionState.hintState || { prepared: { level1: [], level2: [] }, unlockedLevel: 0 };
+        if (hintState.unlockedLevel >= 1 && analysis.hints?.level1?.length > 0) {
+            const reopenBtn = document.createElement('button');
+            reopenBtn.className = 'btn btn-ghost btn-sm hint-reopen-btn';
+            reopenBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Hints anzeigen';
+            reopenBtn.addEventListener('click', () => this.showGlobalHintPopup());
+            feedbackContent.appendChild(reopenBtn);
+        }
+        
+        // Teilaufgaben in übersichtlicher Accordion-Darstellung
+        if (analysis.subTasks && analysis.subTasks.length > 0) {
+            const subTasksContainer = document.createElement('div');
+            subTasksContainer.className = 'theory-subtasks-accordion';
+            
+            analysis.subTasks.forEach((task, idx) => {
+                const taskCard = this._renderTheorySubTaskOptimized(task, idx, formatWithLatex);
+                subTasksContainer.appendChild(taskCard);
+            });
+            
+            feedbackContent.appendChild(subTasksContainer);
+        }
+        
+        // Fehlende Antworten als kompakte Liste
+        if (analysis.missingAnswers && analysis.missingAnswers.length > 0) {
+            const missingBox = document.createElement('div');
+            missingBox.className = 'theory-missing-box';
+            missingBox.innerHTML = `
+                <i class="fas fa-exclamation-circle"></i>
+                <span>Nicht beantwortet: <strong>${analysis.missingAnswers.join(', ')}</strong></span>
+            `;
+            feedbackContent.appendChild(missingBox);
+        }
+        
+        // Kompaktes Feedback am Ende
+        if (analysis.feedback && (analysis.feedback.conceptualUnderstanding || analysis.feedback.improvementSuggestion)) {
+            const feedbackBox = document.createElement('div');
+            feedbackBox.className = 'theory-feedback-summary';
+            
+            let feedbackHTML = '<div class="feedback-items">';
+            if (analysis.feedback.conceptualUnderstanding) {
+                feedbackHTML += `
+                    <div class="feedback-item">
+                        <i class="fas fa-brain"></i>
+                        <span>${formatWithLatex(analysis.feedback.conceptualUnderstanding)}</span>
+                    </div>
+                `;
+            }
+            if (analysis.feedback.improvementSuggestion) {
+                feedbackHTML += `
+                    <div class="feedback-item suggestion">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>${formatWithLatex(analysis.feedback.improvementSuggestion)}</span>
+                    </div>
+                `;
+            }
+            feedbackHTML += '</div>';
+            
+            feedbackBox.innerHTML = feedbackHTML;
+            feedbackContent.appendChild(feedbackBox);
+        }
+        
+        // MathJax rendern
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise([feedbackContent]).catch(err => {
+                console.error('[MathJax] Rendering error:', err);
+            });
+        }
+    }
+    
+    /**
+     * Berechnet Statistiken für Theorie-Aufgaben
+     * @private
+     */
+    _calculateTheoryStats(subTasks) {
+        const stats = { total: subTasks.length, correct: 0, partial: 0, incorrect: 0, missing: 0 };
+        subTasks.forEach(task => {
+            if (task.correctness === 'correct') stats.correct++;
+            else if (task.correctness === 'partial') stats.partial++;
+            else if (task.correctness === 'missing') stats.missing++;
+            else stats.incorrect++;
+        });
+        return stats;
+    }
+    
+    /**
+     * Rendert eine Theorie-Teilaufgabe (optimiert mit LaTeX-Support)
+     * @private
+     */
+    _renderTheorySubTaskOptimized(task, idx, formatWithLatex) {
+        const card = document.createElement('div');
+        
+        const correctnessClass = {
+            'correct': 'subtask-correct',
+            'partial': 'subtask-partial',
+            'incorrect': 'subtask-incorrect',
+            'missing': 'subtask-missing'
+        }[task.correctness] || 'subtask-partial';
+        
+        const statusIcon = {
+            'correct': 'check-circle',
+            'partial': 'minus-circle',
+            'incorrect': 'times-circle',
+            'missing': 'question-circle'
+        }[task.correctness] || 'question-circle';
+        
+        const questionTypeLabels = {
+            'definition': 'Definition',
+            'explanation': 'Erklärung',
+            'proof': 'Beweis',
+            'comparison': 'Vergleich',
+            'example': 'Beispiel'
+        };
+        
+        card.className = `theory-subtask-item ${correctnessClass}`;
+        
+        // Details-Element für Accordion-Verhalten
+        const details = document.createElement('details');
+        details.className = 'subtask-details';
+        
+        // Bei Fehlern automatisch öffnen
+        if (task.correctness !== 'correct') {
+            details.open = true;
+        }
+        
+        // Summary (immer sichtbar)
+        const summary = document.createElement('summary');
+        summary.className = 'subtask-summary';
+        summary.innerHTML = `
+            <div class="summary-left">
+                <span class="subtask-icon ${correctnessClass}"><i class="fas fa-${statusIcon}"></i></span>
+                <span class="subtask-label">${task.label || `Aufgabe ${idx + 1}`}</span>
+                ${task.questionType ? `<span class="subtask-type-badge">${questionTypeLabels[task.questionType] || task.questionType}</span>` : ''}
+            </div>
+            <div class="summary-right">
+                <i class="fas fa-chevron-down expand-icon"></i>
+            </div>
+        `;
+        details.appendChild(summary);
+        
+        // Content (aufklappbar)
+        const content = document.createElement('div');
+        content.className = 'subtask-content';
+        
+        // Zwei-Spalten-Layout: Links Frage, Rechts Status/Bewertung
+        let contentHTML = '<div class="subtask-grid">';
+        
+        // Linke Spalte: Frage und Antwort
+        contentHTML += '<div class="subtask-main">';
+        
+        // Frage (kompakt)
+        if (task.question) {
+            contentHTML += `
+                <div class="subtask-question">
+                    <span class="question-label"><i class="fas fa-question-circle"></i> Aufgabe</span>
+                    <div class="question-text">${formatWithLatex(task.question)}</div>
+                </div>
+            `;
+        }
+        
+        // Schüler-Antwort
+        if (task.studentAnswer && task.correctness !== 'missing') {
+            contentHTML += `
+                <div class="subtask-answer ${correctnessClass}">
+                    <span class="answer-label"><i class="fas fa-user"></i> Deine Antwort</span>
+                    <div class="answer-text">${formatWithLatex(task.studentAnswer)}</div>
+                </div>
+            `;
+        } else if (task.correctness === 'missing') {
+            contentHTML += `
+                <div class="subtask-answer subtask-missing">
+                    <span class="answer-label"><i class="fas fa-user"></i> Deine Antwort</span>
+                    <div class="answer-text empty"><em>Keine Antwort gegeben</em></div>
+                </div>
+            `;
+        }
+        
+        contentHTML += '</div>'; // Ende subtask-main
+        
+        // Rechte Spalte: Feedback und Erklärung
+        contentHTML += '<div class="subtask-feedback">';
+        
+        // Erklärung (bei Fehlern)
+        if (task.explanation && task.correctness !== 'correct') {
+            contentHTML += `
+                <div class="subtask-explanation">
+                    <span class="explanation-label"><i class="fas fa-comment-alt"></i> Feedback</span>
+                    <div class="explanation-text">${formatWithLatex(task.explanation)}</div>
+                </div>
+            `;
+        } else if (task.correctness === 'correct') {
+            contentHTML += `
+                <div class="subtask-explanation correct">
+                    <span class="explanation-label"><i class="fas fa-thumbs-up"></i></span>
+                    <div class="explanation-text">Korrekt!</div>
+                </div>
+            `;
+        }
+        
+        // Schlüsselaspekte als kompakte Checkliste
+        if (task.keyPoints && task.keyPoints.length > 0) {
+            contentHTML += `
+                <div class="subtask-keypoints">
+                    <span class="keypoints-label"><i class="fas fa-tasks"></i> Schlüsselaspekte</span>
+                    <ul class="keypoints-list">
+                        ${task.keyPoints.map(kp => `
+                            <li class="${kp.present ? 'present' : 'missing'}">
+                                <i class="fas fa-${kp.present ? 'check' : 'times'}"></i>
+                                <span>${formatWithLatex(kp.point)}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        contentHTML += '</div>'; // Ende subtask-feedback
+        contentHTML += '</div>'; // Ende subtask-grid
+        
+        // Korrekte Antwort (bei Fehlern, aufklappbar)
+        if (task.correctAnswer && task.correctness !== 'correct') {
+            contentHTML += `
+                <details class="correct-answer-reveal">
+                    <summary><i class="fas fa-eye"></i> Musterlösung anzeigen</summary>
+                    <div class="correct-answer-box">${formatWithLatex(task.correctAnswer)}</div>
+                </details>
+            `;
+        }
+        
+        content.innerHTML = contentHTML;
+        details.appendChild(content);
+        
+        card.appendChild(details);
+        return card;
+    }
+    
+    /**
+     * Rendert das Antwortsatz-Feedback für Sachaufgaben
+     * @private
+     */
+    _renderAnswerSentenceFeedback(answerSentence) {
+        const box = document.createElement('div');
+        
+        // Feedback-Funktion verwenden falls verfügbar
+        let feedbackData;
+        if (window.generateAnswerSentenceFeedback) {
+            feedbackData = window.generateAnswerSentenceFeedback(answerSentence);
+        } else {
+            // Fallback
+            feedbackData = {
+                feedback: answerSentence.present ? 
+                    (answerSentence.quality === 'complete' ? 'Antwortsatz ist korrekt!' : 'Der Antwortsatz könnte verbessert werden.') :
+                    'Der Antwortsatz fehlt!',
+                isOk: answerSentence.present && answerSentence.quality === 'complete',
+                suggestion: answerSentence.suggestion
+            };
+        }
+        
+        // Box-Klasse basierend auf Status
+        if (feedbackData.isOk) {
+            box.className = 'answer-sentence-feedback success-box';
+            box.innerHTML = `
+                <div class="answer-sentence-header">
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Antwortsatz</strong>
+                </div>
+                <p>${feedbackData.feedback}</p>
+                ${answerSentence.studentSentence ? `<blockquote class="student-sentence">${answerSentence.studentSentence}</blockquote>` : ''}
+            `;
+        } else {
+            box.className = 'answer-sentence-feedback warning-box';
+            box.innerHTML = `
+                <div class="answer-sentence-header">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <strong>Antwortsatz</strong>
+                </div>
+                <p>${feedbackData.feedback}</p>
+                ${answerSentence.studentSentence ? `<blockquote class="student-sentence">${answerSentence.studentSentence}</blockquote>` : ''}
+                ${feedbackData.suggestion ? `
+                    <details class="suggestion-details">
+                        <summary><i class="fas fa-lightbulb"></i> Vorschlag anzeigen</summary>
+                        <blockquote class="suggested-sentence">${feedbackData.suggestion}</blockquote>
+                    </details>
+                ` : ''}
+            `;
+        }
+        
+        return box;
     }
 
     /**
@@ -5526,7 +8562,10 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         if (step.rawText) {
             const rawEl = document.createElement('div');
             rawEl.className = 'step-raw';
-            rawEl.textContent = step.rawText;
+            // Korrigiere Umlaute im rawText
+            rawEl.textContent = typeof fixGermanUmlauts === 'function' 
+                ? fixGermanUmlauts(step.rawText) 
+                : step.rawText;
             contentEl.appendChild(rawEl);
         }
         
@@ -5541,11 +8580,19 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
                 cleanLatex = stripLatexDelimiters(cleanLatex);
             }
             
-            // Füge passende Delimiter hinzu
-            if (cleanLatex.includes('\\\\') || cleanLatex.includes('\\begin')) {
-                latexEl.innerHTML = `\\[${cleanLatex}\\]`;
+            // Prüfe ob der Inhalt primär Text ist (mehr als 50% Wörter)
+            const isPrimarilyText = isTextContent(cleanLatex);
+            
+            if (isPrimarilyText) {
+                // Text-Inhalt: Zeige als normalen Text mit eingebetteten Formeln
+                latexEl.innerHTML = renderMixedContent(cleanLatex);
             } else {
-                latexEl.innerHTML = `\\(${cleanLatex}\\)`;
+                // Math-Inhalt: Füge passende Delimiter hinzu
+                if (cleanLatex.includes('\\\\') || cleanLatex.includes('\\begin')) {
+                    latexEl.innerHTML = `\\[${cleanLatex}\\]`;
+                } else {
+                    latexEl.innerHTML = `\\(${cleanLatex}\\)`;
+                }
             }
             contentEl.appendChild(latexEl);
         }
@@ -5553,29 +8600,33 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         stepEl.appendChild(contentEl);
         
         // Stufe-2-Hinweise inline anzeigen (falls freigeschaltet)
+        // Der Hint ist visuell mit dem Step durch Farbe und Pfeil verbunden
         if (hasLevel2Hints) {
+            // Markiere den Step-Content als mit Hint verbunden
+            contentEl.classList.add('has-hint-connection');
+            
             const annotations = document.createElement('div');
             annotations.className = 'step-hint-annotations';
             level2Hints.forEach(hint => {
                 const box = document.createElement('div');
                 const colorClass = hint.color ? `hint-annotation-${hint.color}` : 'hint-annotation-blue';
                 box.className = `hint-annotation ${colorClass}`;
+                
+                // Connector-Pfeil der visuell nach oben zeigt
+                const connector = document.createElement('div');
+                connector.className = 'hint-connector';
+                connector.innerHTML = '<i class="fas fa-arrow-up"></i>';
+                box.appendChild(connector);
 
                 const title = document.createElement('div');
                 title.className = 'hint-annotation-title';
-                title.textContent = hint.title || 'Hint';
+                // Verwende solutionApproach (Level 2) mit Fallback auf title/text
+                // Zeige den vollständigen Hint-Text ohne Kürzung
+                let processedTitle = hint.solutionApproach || hint.title || hint.text || 'Prüfe diesen Schritt.';
+                processedTitle = convertLatexSymbolsToUnicode(processedTitle);
+                processedTitle = fixGermanUmlauts(processedTitle);
+                title.textContent = processedTitle;
                 box.appendChild(title);
-
-                if (hint.latex) {
-                    const latexEl = document.createElement('div');
-                    latexEl.className = 'hint-annotation-latex';
-                    let cleanLatex = hint.latex;
-                    if (typeof stripLatexDelimiters === 'function') {
-                        cleanLatex = stripLatexDelimiters(cleanLatex);
-                    }
-                    latexEl.innerHTML = `\\(${cleanLatex}\\)`;
-                    box.appendChild(latexEl);
-                }
 
                 annotations.appendChild(box);
             });
@@ -5754,8 +8805,8 @@ Erstelle eine passende Mathematik-Aufgabe basierend auf den gegebenen Parametern
         const content = document.createElement('div');
         content.className = 'detailed-feedback-content';
 
-        // Helper-Funktion um LaTeX in Text zu wrappen
-        const formatText = (text) => typeof wrapLatexInText === 'function' ? wrapLatexInText(text) : text;
+        // Nur Umlaute korrigieren, kein LaTeX-Wrapping für Feedback-Text
+        const formatText = (text) => typeof fixGermanUmlauts === 'function' ? fixGermanUmlauts(text) : text;
 
         // Stärken
         if (detailedFeedback.strengths && detailedFeedback.strengths.length > 0) {
@@ -6041,14 +9092,26 @@ Erstelle die Musterlösung.`;
                 solutionData.comparison.correctSteps = solutionData.comparison.correctSteps.map(step => sanitizeStepLatex(step));
             }
             
-            // Generiere detailedFeedback programmatisch aus Templates
-            const topic = this.currentTaskContext?.topic || 'algebra';
-            if (typeof window.generateDetailedFeedback === 'function') {
-                solutionData.detailedFeedback = window.generateDetailedFeedback(lastAnalysis, topic);
+            // Verwende KI-generiertes detailedFeedback wenn vorhanden, sonst Fallback auf Templates
+            if (lastAnalysis && lastAnalysis.detailedFeedback) {
+                // KI hat bereits inhaltliches Feedback generiert - verwende es
+                solutionData.detailedFeedback = lastAnalysis.detailedFeedback;
+            } else {
+                // Fallback auf Templates wenn KI kein Feedback geliefert hat
+                const topic = this.currentTaskContext?.topic || 'algebra';
+                if (typeof window.generateDetailedFeedback === 'function') {
+                    solutionData.detailedFeedback = window.generateDetailedFeedback(lastAnalysis, topic);
+                }
             }
             solutionData.feedbackLevel = 'detailed';
             solutionData.isCorrect = false;
-            solutionData.hints = { level1: [], level2: [] };
+            
+            // Verwende KI-generierte Hints wenn vorhanden
+            if (lastAnalysis && lastAnalysis.hints) {
+                solutionData.hints = lastAnalysis.hints;
+            } else {
+                solutionData.hints = { level1: [], level2: [] };
+            }
             solutionData.uiElements = [];
 
             // Speichere die Level-3-Daten
@@ -6125,43 +9188,85 @@ Erstelle die Musterlösung.`;
         header.appendChild(closeBtn);
         modal.appendChild(header);
 
-        // Level 1 Chips
+        // Level 1 Chips - als Plain Text mit Unicode-Symbolen (kein MathJax)
         const chipList = document.createElement('div');
         chipList.className = 'hint-chip-list';
         preparedHints.level1.forEach(h => {
             const chip = document.createElement('span');
             const colorClass = h.color === 'yellow' ? 'hint-chip-yellow' : `hint-chip-${h.color || 'orange'}`;
             chip.className = `tutor-hint-chip ${colorClass}`;
-            chip.innerHTML = `<i class="fas fa-bolt"></i> ${h.label}`;
+            // LaTeX-Symbole zu Unicode konvertieren und Umlaute korrigieren
+            let processedLabel = convertLatexSymbolsToUnicode(h.label || '');
+            processedLabel = fixGermanUmlauts(processedLabel);
+            // Als textContent setzen um HTML-Injection zu vermeiden und MathJax zu umgehen
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-bolt';
+            chip.appendChild(icon);
+            chip.appendChild(document.createTextNode(' ' + processedLabel));
             chipList.appendChild(chip);
         });
         modal.appendChild(chipList);
 
         // Level 2 falls freigeschaltet
+        // Zeigt Lösungskonzept-Hinweise (WIE man es lösen kann) pro Schritt
         if (hintState.unlockedLevel >= 2 && preparedHints.level2 && preparedHints.level2.length > 0) {
             const l2Container = document.createElement('div');
             l2Container.className = 'hint-level2-popup';
-            l2Container.innerHTML = `<div class="hint-level2-title"><i class="fas fa-tools"></i> Stufe 2 Hinweise</div>`;
-            preparedHints.level2.forEach(h => {
+            l2Container.innerHTML = `<div class="hint-level2-title"><i class="fas fa-route"></i> Lösungsansätze</div>`;
+            preparedHints.level2.forEach((h, idx) => {
                 const row = document.createElement('div');
                 row.className = 'hint-level2-row';
-                row.innerHTML = `
-                    <span class="hint-level2-step">Schritt ${h.stepIndex}</span>
-                    <span class="hint-level2-text">${h.title || 'Hint'}</span>
-                    ${h.latex ? `<span class="hint-level2-formula">\\(${stripLatexDelimiters(h.latex)}\\)</span>` : ''}
-                `;
+                
+                // Step-Badge - nur anzeigen wenn stepIndex vorhanden und gültig ist
+                // Für Theorie-Aufgaben kann auch subTaskLabel verwendet werden
+                const stepBadge = document.createElement('span');
+                stepBadge.className = 'hint-level2-step';
+                if (h.subTaskLabel) {
+                    // Theorie-Aufgaben: Zeige Teilaufgaben-Label
+                    stepBadge.textContent = h.subTaskLabel;
+                } else if (h.stepIndex !== undefined && h.stepIndex !== null) {
+                    // Berechnungen: Zeige Schritt-Nummer
+                    stepBadge.textContent = `Schritt ${h.stepIndex}`;
+                } else {
+                    // Fallback: Nutze Position im Array
+                    stepBadge.textContent = `Tipp ${idx + 1}`;
+                }
+                row.appendChild(stepBadge);
+                
+                // solutionApproach als Plain Text - der Lösungskonzept-Hinweis
+                // Fallback auf title oder text für Backwards-Kompatibilität
+                const approachSpan = document.createElement('span');
+                approachSpan.className = 'hint-level2-text';
+                let approachText = h.solutionApproach || h.text || h.title || 'Überdenke diesen Schritt nochmal.';
+                approachText = convertLatexSymbolsToUnicode(approachText);
+                approachText = fixGermanUmlauts(approachText);
+                approachSpan.textContent = approachText;
+                row.appendChild(approachSpan);
+                
+                // Optional: Formel anzeigen wenn vorhanden
+                if (h.latex && h.latex.trim()) {
+                    const formulaSpan = document.createElement('span');
+                    formulaSpan.className = 'hint-level2-formula';
+                    formulaSpan.innerHTML = `\\(${h.latex}\\)`;
+                    row.appendChild(formulaSpan);
+                }
+                
                 l2Container.appendChild(row);
             });
             modal.appendChild(l2Container);
+            
+            // MathJax rendern falls Formeln vorhanden
+            if (preparedHints.level2.some(h => h.latex && h.latex.trim())) {
+                if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+                    MathJax.typesetPromise([l2Container]).catch(err => console.warn('[Hints] MathJax error:', err));
+                }
+            }
         }
 
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-
-        // MathJax rendern falls vorhanden
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            window.MathJax.typesetPromise([modal]).catch(err => console.warn('MathJax error:', err));
-        }
+        
+        // Kein MathJax mehr nötig da keine Formeln im Popup
     }
 
     /**
@@ -6250,6 +9355,29 @@ Erstelle die Musterlösung.`;
             }
 
             modal.appendChild(feedbackContainer);
+        }
+
+        // "Aufgabe Erklären" Button hinzufügen - zum Erklärungs-Tab navigieren
+        if (this.currentTask) {
+            const actionContainer = document.createElement('div');
+            actionContainer.className = 'feedback-action-container';
+            actionContainer.style.cssText = 'margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--surface-3); text-align: center;';
+            
+            const explainBtn = document.createElement('button');
+            explainBtn.className = 'btn btn-primary';
+            explainBtn.innerHTML = '<i class="fas fa-question-circle"></i> Aufgabe erklären lassen';
+            explainBtn.style.cssText = 'padding: 12px 24px; font-size: 1rem;';
+            
+            explainBtn.addEventListener('click', () => {
+                // Schließe das Popup
+                overlay.remove();
+                
+                // Navigiere zum "Aufgabe Erklären" Tab
+                this.navigateToExplainTab(this.currentTask);
+            });
+            
+            actionContainer.appendChild(explainBtn);
+            modal.appendChild(actionContainer);
         }
 
         overlay.appendChild(modal);
@@ -6663,6 +9791,19 @@ Verwende eine klare Struktur und deutsche mathematische Terminologie.
     clearTextInput() {
         document.getElementById('math-input').value = '';
         this.closeResults();
+        
+        // Lösche auch den Erklärungskontext
+        this.explanationContext = {
+            originalQuestion: null,
+            originalResponse: null,
+            hasContext: false
+        };
+        
+        // Entferne Follow-up Bereich falls vorhanden
+        const followupArea = document.getElementById('followup-input-area');
+        if (followupArea) {
+            followupArea.remove();
+        }
     }
 
     closeResults() {
@@ -6723,15 +9864,30 @@ Verwende eine klare Struktur und deutsche mathematische Terminologie.
     populateProfileForm(profile) {
         // Warte kurz, um sicherzustellen, dass alle DOM-Elemente verfügbar sind
         setTimeout(() => {
+            // Stelle sicher, dass currentUser aus window.currentUser geladen ist
+            if (window.currentUser && !this.currentUser) {
+                this.currentUser = window.currentUser;
+                console.log('[Profile] Loaded currentUser from window:', this.currentUser);
+            }
+
             const userNameEl = document.getElementById('user-name');
             const userEmailEl = document.getElementById('user-email');
             const learningStyleEl = document.getElementById('learning-style');
-            
-            if (userNameEl) userNameEl.value = profile.name || '';
+
+            // Name und E-Mail aus dem eingeloggten User übernehmen
+            if (userNameEl) {
+                const nameValue = (this.currentUser && this.currentUser.name) ||
+                                  (this.currentUser && this.currentUser.attributes && this.currentUser.attributes.name) ||
+                                  profile.name || '';
+                userNameEl.value = nameValue;
+                profile.name = nameValue;
+                console.log('[Profile] Set user name to:', nameValue);
+            }
             if (userEmailEl) {
                 const emailValue = (this.currentUser && this.currentUser.email) || profile.email || '';
                 userEmailEl.value = emailValue;
                 profile.email = emailValue;
+                console.log('[Profile] Set user email to:', emailValue);
             }
             if (learningStyleEl) learningStyleEl.value = profile.learningStyle || 'step-by-step';
 
@@ -6803,8 +9959,9 @@ Verwende eine klare Struktur und deutsche mathematische Terminologie.
 
     saveUserProfile() {
         const profile = {
-            name: document.getElementById('user-name').value.trim(),
-            email: (document.getElementById('user-email')?.value || this.currentUser?.email || '').trim(),
+            // Name und Email kommen vom eingeloggten User (readonly Felder)
+            name: (this.currentUser?.name || this.currentUser?.attributes?.name || document.getElementById('user-name')?.value || '').trim(),
+            email: (this.currentUser?.email || document.getElementById('user-email')?.value || '').trim(),
             grade: 'abitur',
             learningGoal: 'abitur-prep',
             weakTopics: this.getSelectedWeakTopics(),
@@ -7209,6 +10366,8 @@ Beantworte die Frage verständlich und gehe gezielt auf seine Unsicherheit ein. 
 
 // Initialisierung der Anwendung
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('[App] DOMContentLoaded fired');
+    console.log('[App] MATH_TOPICS loaded:', typeof window.MATH_TOPICS !== 'undefined');
     new MathTutorAI();
 });
 

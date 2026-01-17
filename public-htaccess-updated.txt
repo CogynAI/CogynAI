@@ -1,0 +1,35 @@
+# Cogyn.app - Apache Configuration
+# Aktuelle .htaccess für httpdocs/public/
+
+# Enable RewriteEngine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # WICHTIG: Fange /defaultsite ab und leite weiter
+    RewriteCond %{REQUEST_URI} ^/defaultsite.*$ [NC]
+    RewriteRule ^.*$ /login.html [L,R=301]
+
+    # Auth API Routing - leite /api/auth/* zu /api/auth.php weiter
+    RewriteCond %{REQUEST_URI} ^/api/auth/(.+)$
+    RewriteRule ^api/auth/(.+)$ /api/auth.php [L,QSA]
+
+    # Fallback: Wenn index.html nicht gefunden -> index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} ^/$
+    RewriteRule ^$ /index.php [L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "\.(sqlite|db|log|env)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Custom Error Pages
+ErrorDocument 404 /defaultsite-fix.html
+ErrorDocument 403 /defaultsite-fix.html

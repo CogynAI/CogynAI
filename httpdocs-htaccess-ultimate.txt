@@ -1,0 +1,66 @@
+# Cogyn.app - Root htaccess (httpdocs/)
+# Diese Datei liegt in httpdocs/ und leitet zu public/ weiter
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # =========================================
+    # 1. HTTPS ERZWINGEN (höchste Priorität)
+    # =========================================
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # =========================================
+    # 2. DEFAULTSITE ABFANGEN
+    # =========================================
+    # Fange /defaultsite oder defaultsite ab und leite zu public/login.html
+    RewriteCond %{REQUEST_URI} ^/?defaultsite.*$ [NC]
+    RewriteRule ^.*$ https://cogyn.app/public/login.html [L,R=301]
+
+    # =========================================
+    # 3. WWW zu NON-WWW (optional)
+    # =========================================
+    RewriteCond %{HTTP_HOST} ^www\.cogyn\.app$ [NC]
+    RewriteRule ^(.*)$ https://cogyn.app/$1 [L,R=301]
+
+    # =========================================
+    # 4. PUBLIC DIRECTORY ROUTING
+    # =========================================
+    # Verhindere Endlosschleifen
+    RewriteCond %{REQUEST_URI} !^/public/
+
+    # Wenn Datei/Ordner NICHT in httpdocs/ existiert, leite zu /public/ weiter
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ /public/$1 [L,QSA]
+
+    # Root (/) wird zu /public/index.html
+    RewriteCond %{REQUEST_URI} ^/$
+    RewriteRule ^$ /public/index.html [L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# Custom Error Pages
+ErrorDocument 404 /public/defaultsite-fix.html
+ErrorDocument 403 /public/defaultsite-fix.html
+ErrorDocument 500 /public/defaultsite-fix.html
+
+# Security Headers
+<IfModule mod_headers.c>
+    # HTTPS Upgrade
+    Header always set Content-Security-Policy "upgrade-insecure-requests"
+
+    # Security Headers
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# Protect sensitive files
+<FilesMatch "\.(sqlite|db|log|env|md|txt)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

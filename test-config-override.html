@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Config Override Test</title>
+    <!-- OVERRIDE CONFIG DIREKT HIER -->
+    <script>
+        // Setze Config VOR dem Laden von aws-config.js
+        window.AWS_CONFIG = {
+            AUTH_MODE: 'backend',
+            API_BASE_URL: '', // LEER = relative URLs = cogyn.app
+            USE_MOCK: false
+        };
+        console.log('[Override] AWS_CONFIG gesetzt:', window.AWS_CONFIG);
+    </script>
+    <script src="/auth/auth-service.js"></script>
+</head>
+<body>
+    <h1>Config Override Test</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        async function test() {
+            output.innerHTML += '<h2>Config Check</h2>';
+            output.innerHTML += `<p>API_BASE_URL: "${window.AWS_CONFIG.API_BASE_URL}"</p>`;
+            output.innerHTML += `<p>AUTH_MODE: ${window.AWS_CONFIG.AUTH_MODE}</p>`;
+
+            const authService = new AuthService();
+            output.innerHTML += `<p><strong>AuthService API Base URL:</strong> "${authService.apiBaseUrl}"</p>`;
+
+            // Test Register
+            output.innerHTML += '<h2>Testing Register</h2>';
+            const email = 'overridetest_' + Date.now() + '@example.com';
+            const testUrl = `${authService.apiBaseUrl}/api/auth/register.php`;
+
+            output.innerHTML += `<p><strong>Full URL:</strong> <code>${testUrl}</code></p>`;
+
+            try {
+                const response = await fetch(testUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        password: 'Test123!',
+                        name: 'Override Test'
+                    })
+                });
+
+                output.innerHTML += `<p><strong>Status:</strong> ${response.status}</p>`;
+                const text = await response.text();
+
+                if (response.status === 200) {
+                    output.innerHTML += '<p style="color: green; font-size: 20px;">✅ SUCCESS!</p>';
+                    output.innerHTML += '<pre>' + text + '</pre>';
+                } else {
+                    output.innerHTML += '<p style="color: red;">❌ FAILED</p>';
+                    output.innerHTML += '<pre>' + text.substring(0, 500) + '</pre>';
+                }
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;">ERROR: ${error.message}</p>`;
+            }
+        }
+
+        test();
+    </script>
+</body>
+</html>

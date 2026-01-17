@@ -1,0 +1,15 @@
+# Cogyn.app - Redirect Root to Public Directory
+# Diese .htaccess sollte in httpdocs/ (nicht public/) liegen
+
+# Aktiviere RewriteEngine
+RewriteEngine On
+
+# Verhindere Endlosschleifen
+RewriteCond %{REQUEST_URI} !^/public/
+
+# Leite alles zu /public/ weiter AUSSER /public/ selbst
+RewriteRule ^(.*)$ /public/$1 [L,QSA]
+
+# Alternative: Nur Root-Anfragen weiterleiten
+# RewriteCond %{REQUEST_URI} ^/$
+# RewriteRule ^$ /public/index.html [L,R=301]

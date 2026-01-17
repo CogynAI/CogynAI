@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Session Debug</title>
+    <script>
+        window.AWS_CONFIG = {
+            AUTH_MODE: 'backend',
+            API_BASE_URL: '',
+            USE_MOCK: false
+        };
+    </script>
+    <script src="/auth/auth-service.js"></script>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #0D3D3D; color: #40E0D0; }
+        h1 { color: #40E0D0; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        pre { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Session Debug</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        async function debugSession() {
+            output.innerHTML += '<h2>1. LocalStorage Check</h2>';
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                output.innerHTML += `<p class="success">✅ Token gefunden: ${token.substring(0, 20)}...</p>`;
+            } else {
+                output.innerHTML += `<p class="error">❌ Kein Token in localStorage!</p>`;
+            }
+
+            output.innerHTML += '<h2>2. AuthService Check</h2>';
+            try {
+                const authService = new AuthService();
+                output.innerHTML += `<p>AuthService erstellt</p>`;
+                output.innerHTML += `<p>API Base URL: "${authService.apiBaseUrl}"</p>`;
+                output.innerHTML += `<p>Auth Mode: ${authService.authMode}</p>`;
+                output.innerHTML += `<p>Session Token: ${authService.sessionToken ? authService.sessionToken.substring(0, 20) + '...' : 'NONE'}</p>`;
+
+                output.innerHTML += '<h2>3. getCurrentUser() Test</h2>';
+
+                const user = await authService.getCurrentUser();
+
+                if (user) {
+                    output.innerHTML += `<p class="success">✅ User gefunden!</p>`;
+                    output.innerHTML += '<pre>' + JSON.stringify(user, null, 2) + '</pre>';
+                    output.innerHTML += '<p class="success"><strong>→ Login sollte funktionieren!</strong></p>';
+                } else {
+                    output.innerHTML += `<p class="error">❌ Kein User (getCurrentUser returned null)</p>`;
+                }
+
+            } catch (error) {
+                output.innerHTML += `<p class="error">❌ Fehler: ${error.message}</p>`;
+                output.innerHTML += '<pre>' + error.stack + '</pre>';
+                output.innerHTML += '<p class="error"><strong>→ Deshalb Redirect zu login.html!</strong></p>';
+            }
+
+            output.innerHTML += '<h2>4. Direkter /me Test</h2>';
+            if (token) {
+                try {
+                    const response = await fetch('/api/auth/me.php?token=' + encodeURIComponent(token), {
+                        headers: {
+                            'Authorization': 'Bearer ' + token
+                        }
+                    });
+
+                    output.innerHTML += `<p>Response Status: ${response.status}</p>`;
+                    const text = await response.text();
+                    output.innerHTML += '<pre>' + text.substring(0, 500) + '</pre>';
+                } catch (error) {
+                    output.innerHTML += `<p class="error">Fetch Error: ${error.message}</p>`;
+                }
+            }
+
+            output.innerHTML += '<hr><h2>🔧 Quick Fix</h2>';
+            output.innerHTML += '<button onclick="localStorage.clear(); location.reload();">Clear Storage & Reload</button> ';
+            output.innerHTML += '<button onclick="location.href=\'/login.html\'">Go to Login</button> ';
+            output.innerHTML += '<button onclick="location.href=\'/index.html\'">Go to Index</button>';
+        }
+
+        debugSession();
+    </script>
+</body>
+</html>

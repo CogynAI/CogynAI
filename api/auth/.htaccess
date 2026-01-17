@@ -1,0 +1,27 @@
+# Cogyn Auth API - URL Rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /api/auth/
+    
+    # Authorization Header durchreichen (wichtig für Bearer Tokens!)
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    
+    # Wenn Datei oder Verzeichnis existiert, direkt ausliefern
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Alle anderen Requests an index.php weiterleiten
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# CGI-Auth Fix (für einige Server-Konfigurationen)
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
+# PHP Einstellungen
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_value error_reporting 0
+</IfModule>

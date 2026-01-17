@@ -168,17 +168,19 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="register-birthdate">
+                        <label for="register-age">
                             <i class="fas fa-birthday-cake"></i>
-                            Geburtsdatum
+                            Alter
                         </label>
                         <input 
-                            type="date" 
-                            id="register-birthdate" 
+                            type="number" 
+                            id="register-age" 
+                            placeholder="z.B. 17"
                             required
-                            max=""
+                            min="10"
+                            max="99"
                         >
-                        <small>Dein Geburtsdatum hilft uns, Inhalte an dein Alter anzupassen.</small>
+                        <small>Dein Alter hilft uns, Inhalte passend anzupassen.</small>
                     </div>
 
                     <div class="form-options">

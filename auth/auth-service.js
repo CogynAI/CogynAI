@@ -13,7 +13,12 @@ class AuthService {
         this.useBackend = this.authMode === 'backend';
         
         // Backend API URL
-        this.apiBaseUrl = this.config.API_BASE_URL || 'http://localhost:4000';
+        // Check hostname statt config, weil '' (leerer String) falsy ist
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            this.apiBaseUrl = 'http://localhost:4000';
+        } else {
+            this.apiBaseUrl = this.config.API_BASE_URL || '';
+        }
         
         // Session Token Storage
         this.sessionToken = localStorage.getItem('auth_token') || null;
@@ -65,13 +70,23 @@ class AuthService {
     // ==================== Backend API Helper ====================
     
     async _backendFetch(endpoint, options = {}) {
-        const url = `${this.apiBaseUrl}/api/auth${endpoint}`;
+        // Baue URL - füge .php Endung hinzu für direkte Endpoints
+        // /register -> /api/auth/register.php
+        let url = `${this.apiBaseUrl}/api/auth${endpoint}.php`;
+        
+        // Füge Token als Query-Parameter hinzu wenn vorhanden
+        // (nginx/Plesk können Authorization Header strippen)
+        if (this.sessionToken) {
+            const separator = url.includes('?') ? '&' : '?';
+            url += `${separator}token=${encodeURIComponent(this.sessionToken)}`;
+        }
         
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers
         };
         
+        // Auch als Header senden (für lokale Entwicklung und andere Server)
         if (this.sessionToken) {
             headers['Authorization'] = `Bearer ${this.sessionToken}`;
         }
@@ -107,7 +122,7 @@ class AuthService {
                         email,
                         password,
                         name: attributes.name,
-                        birthDate: attributes.birthDate
+                        age: attributes.age
                     })
                 });
                 
@@ -205,22 +220,22 @@ class AuthService {
                         rememberMe
                     })
                 });
-                
-                // Session token is in apiResult.session.token
-                const sessionToken = apiResult.session?.token;
+
+                // Token kann in apiResult.token ODER apiResult.session.token sein
+                const sessionToken = apiResult.token || apiResult.session?.token;
                 if (apiResult.success && sessionToken) {
                     // Store session token
                     this.sessionToken = sessionToken;
                     localStorage.setItem('auth_token', sessionToken);
                     this.currentUser = apiResult.user;
                 }
-                
+
                 result = {
                     success: true,
                     user: apiResult.user,
                     session: {
                         token: sessionToken,
-                        expiresAt: apiResult.session?.expiresAt,
+                        expiresAt: apiResult.session?.expiresAt || null,
                         rememberMe: rememberMe
                     }
                 };
@@ -298,20 +313,26 @@ class AuthService {
                 if (this.currentUser) {
                     return this.currentUser;
                 }
-                
-                // No token, no user
+
+                // Versuche Token aus localStorage zu laden wenn nicht vorhanden
                 if (!this.sessionToken) {
-                    return null;
+                    const storedToken = localStorage.getItem('auth_token');
+                    if (storedToken) {
+                        this.sessionToken = storedToken;
+                    } else {
+                        return null;
+                    }
                 }
-                
+
                 // Fetch user from backend
                 const result = await this._backendFetch('/me');
-                
-                if (result.success && result.user) {
+
+                // Backend gibt { user: {...} } zurück (kein success flag)
+                if (result && result.user) {
                     this.currentUser = result.user;
                     return result.user;
                 }
-                
+
                 return null;
             } else {
                 const cognitoUser = await window.Amplify.Auth.currentAuthenticatedUser();

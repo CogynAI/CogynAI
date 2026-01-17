@@ -4,12 +4,14 @@
 const AWS_CONFIG = {
     // Auth-Modus: 'mock', 'backend', 'production'
     // - 'mock': Simuliert Authentifizierung mit localStorage (nur für UI-Tests)
-    // - 'backend': Nutzt lokalen Express-Server mit SQLite (Standard für Entwicklung)
+    // - 'backend': Nutzt PHP API mit MariaDB (Standard für Production)
     // - 'production': Nutzt echte AWS Cognito (für Production)
     AUTH_MODE: 'backend',
     
     // Backend-API URL (nur im 'backend'-Modus verwendet)
-    API_BASE_URL: 'http://localhost:4000',
+    // Production: relative URL zur PHP API (leerer String = gleiche Domain)
+    // Lokal: http://localhost:4000 für Node.js Server
+    API_BASE_URL: (typeof window !== 'undefined' && window.location.hostname === 'localhost') ? 'http://localhost:4000' : '',
     
     // Legacy: USE_MOCK wird durch AUTH_MODE ersetzt
     USE_MOCK: false, // Auf true nur für Mock-Modus

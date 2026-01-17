@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage leeren - Cogyn</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #0D3D3D 0%, #1a5f5f 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+        }
+        h1 { margin: 0 0 20px 0; }
+        .btn {
+            background: #40E0D0;
+            color: #0D3D3D;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(64, 224, 208, 0.4);
+        }
+        .success {
+            background: #4CAF50;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Browser-Speicher leeren</h1>
+        <p>Löscht alle lokalen Daten (localStorage, sessionStorage, Cookies)</p>
+
+        <button class="btn" onclick="clearAll()">Alles löschen</button>
+        <button class="btn" onclick="goToLogin()">Zum Login</button>
+
+        <div class="success" id="success">
+            ✅ Alle Daten gelöscht! Du kannst jetzt zum Login gehen.
+        </div>
+
+        <div class="info">
+            <strong>Was wird gelöscht?</strong><br>
+            • localStorage (User-Profile, Tracking-Daten)<br>
+            • sessionStorage (Temporäre Session-Daten)<br>
+            • Cookies<br>
+            • Cache
+        </div>
+    </div>
+
+    <script>
+        function clearAll() {
+            // localStorage leeren
+            localStorage.clear();
+
+            // sessionStorage leeren
+            sessionStorage.clear();
+
+            // Cookies löschen
+            document.cookie.split(";").forEach(function(c) {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
+
+            console.log('✅ Alle Browser-Daten gelöscht');
+
+            // Zeige Success-Nachricht
+            document.getElementById('success').style.display = 'block';
+        }
+
+        function goToLogin() {
+            window.location.href = '/login.html';
+        }
+
+        // Automatisch beim Laden ausführen
+        window.addEventListener('load', function() {
+            clearAll();
+        });
+    </script>
+</body>
+</html>

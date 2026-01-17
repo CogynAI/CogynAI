@@ -1,20 +1,20 @@
 /* =====================================================
-   MATRIX SPLASH ANIMATION
-   Futuristic loading screen with animated logo
+   SPLASH ANIMATION - CLEAN REWRITE
+   Simple, clear animation structure
    ===================================================== */
 
-/* CSS Variables for Splash */
+/* =====================================================
+   1. CSS VARIABLES
+   ===================================================== */
 :root {
     --splash-bg: #0a0a0f;
     --splash-primary: #40E0D0;
     --splash-secondary: #1E6B6B;
     --splash-dark: #0D3D3D;
-    --splash-glow: rgba(64, 224, 208, 0.6);
-    --splash-duration: 7s;
 }
 
 /* =====================================================
-   SPLASH OVERLAY CONTAINER
+   2. SPLASH OVERLAY CONTAINER
    ===================================================== */
 .splash-overlay {
     position: fixed;
@@ -30,12 +30,8 @@
     overflow: hidden;
 }
 
-.splash-overlay.hidden {
-    pointer-events: none;
-}
-
 /* =====================================================
-   HORIZONTAL SPLIT CONTAINERS (TOP/BOTTOM)
+   3. SPLIT PANELS (TOP / BOTTOM)
    ===================================================== */
 .splash-top,
 .splash-bottom {
@@ -45,39 +41,76 @@
     height: 50%;
     overflow: hidden;
     background: var(--splash-bg);
+    z-index: 10;
 }
 
 .splash-top {
     top: 0;
-    transform-origin: center top;
 }
 
 .splash-bottom {
     bottom: 0;
-    transform-origin: center bottom;
 }
 
-/* Horizontal Split animation */
+/* Split animation */
 .splash-overlay.splitting .splash-top {
-    animation: splitTop 1s ease-in-out forwards;
+    animation: splitTop 0.6s ease-in-out forwards;
 }
 
 .splash-overlay.splitting .splash-bottom {
-    animation: splitBottom 1s ease-in-out forwards;
+    animation: splitBottom 0.6s ease-in-out forwards;
 }
 
 @keyframes splitTop {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-100%); }
+    to { transform: translateY(-100%); }
 }
 
 @keyframes splitBottom {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(100%); }
+    to { transform: translateY(100%); }
+}
+
+/* Matrix background in panels */
+.matrix-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    opacity: 0.3;
+}
+
+.matrix-column {
+    position: absolute;
+    top: -100%;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--splash-primary);
+    text-shadow: 0 0 10px rgba(64, 224, 208, 0.6);
+    writing-mode: vertical-rl;
+    animation: matrixFall linear infinite;
+}
+
+@keyframes matrixFall {
+    to { transform: translateY(200vh); }
+}
+
+/* Circuit lines */
+.circuit-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.1;
+    background-image: 
+        linear-gradient(var(--splash-primary) 1px, transparent 1px),
+        linear-gradient(90deg, var(--splash-primary) 1px, transparent 1px);
+    background-size: 50px 50px;
 }
 
 /* =====================================================
-   HORIZONTAL LIGHT LINE
+   4. LIGHT LINE
    ===================================================== */
 .light-line {
     position: absolute;
@@ -95,401 +128,285 @@
     transform: scaleX(0) translateY(-50%);
     opacity: 0;
     z-index: 50;
-    box-shadow: 
-        0 0 20px 5px rgba(255,255,255,0.5),
-        0 0 40px 10px rgba(64, 224, 208, 0.3),
-        0 0 60px 20px rgba(64, 224, 208, 0.2);
+    box-shadow: 0 0 30px 10px rgba(255,255,255,0.5);
 }
 
 .splash-overlay.light-active .light-line {
-    animation: lightLineExpand 0.6s ease-out forwards;
+    animation: lightExpand 0.3s ease-out forwards;
 }
 
-@keyframes lightLineExpand {
-    0% { 
-        transform: scaleX(0) translateY(-50%);
-        opacity: 0;
-        height: 2px;
-    }
-    50% {
+@keyframes lightExpand {
+    to { 
         transform: scaleX(1) translateY(-50%);
         opacity: 1;
-        height: 2px;
-    }
-    100% { 
-        transform: scaleX(1) translateY(-50%);
-        opacity: 1;
-        height: 6px;
-        box-shadow: 
-            0 0 40px 15px rgba(255,255,255,0.8),
-            0 0 80px 30px rgba(64, 224, 208, 0.5),
-            0 0 120px 50px rgba(64, 224, 208, 0.3);
     }
 }
 
 /* =====================================================
-   WHITE OVERLAY TRANSITION
-   ===================================================== */
-.white-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: white;
-    opacity: 0;
-    z-index: 99998;
-    pointer-events: none;
-}
-
-.white-overlay.active {
-    animation: whiteReveal 1.5s ease-in-out forwards;
-}
-
-@keyframes whiteReveal {
-    0% { 
-        opacity: 0;
-    }
-    40% {
-        opacity: 1;
-    }
-    100% { 
-        opacity: 1;
-    }
-}
-
-.white-overlay.fading {
-    animation: whiteFadeOut 1.5s ease-out forwards;
-}
-
-@keyframes whiteFadeOut {
-    0% { 
-        opacity: 1;
-    }
-    100% { 
-        opacity: 0;
-    }
-}
-
-/* =====================================================
-   BLUR-TO-SHARP REVEAL FOR MAIN CONTENT
-   ===================================================== */
-.app-layout.splash-blur {
-    filter: blur(30px);
-    opacity: 0;
-    transform: scale(1.05);
-}
-
-.app-layout.revealing {
-    animation: revealSharp 2s ease-out forwards;
-}
-
-@keyframes revealSharp {
-    0% { 
-        filter: blur(30px);
-        opacity: 0.3;
-        transform: scale(1.05);
-    }
-    30% {
-        filter: blur(20px);
-        opacity: 0.5;
-        transform: scale(1.03);
-    }
-    60% {
-        filter: blur(10px);
-        opacity: 0.7;
-        transform: scale(1.01);
-    }
-    100% { 
-        filter: blur(0);
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* =====================================================
-   MATRIX BACKGROUND
-   ===================================================== */
-.matrix-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    opacity: 0.3;
-}
-
-.matrix-column {
-    position: absolute;
-    top: -100%;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    color: var(--splash-primary);
-    text-shadow: 0 0 10px var(--splash-glow);
-    writing-mode: vertical-rl;
-    animation: matrixFall linear infinite;
-    opacity: 0.7;
-}
-
-@keyframes matrixFall {
-    0% { 
-        transform: translateY(0);
-        opacity: 1;
-    }
-    100% { 
-        transform: translateY(200vh);
-        opacity: 0.3;
-    }
-}
-
-/* Circuit lines background */
-.circuit-lines {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0.1;
-    background-image: 
-        linear-gradient(var(--splash-primary) 1px, transparent 1px),
-        linear-gradient(90deg, var(--splash-primary) 1px, transparent 1px);
-    background-size: 50px 50px;
-}
-
-/* Radial glow behind logo */
-.splash-glow {
-    position: absolute;
-    width: 600px;
-    height: 600px;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--splash-glow) 0%, transparent 70%);
-    opacity: 0;
-    animation: glowPulse 2s ease-in-out infinite;
-}
-
-@keyframes glowPulse {
-    0%, 100% { opacity: 0.3; transform: scale(0.9); }
-    50% { opacity: 0.6; transform: scale(1.1); }
-}
-
-/* =====================================================
-   LOGO CONTAINER
+   5. LOGO CONTAINER
    ===================================================== */
 .logo-container {
     position: absolute;
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 10;
+    z-index: 5;
 }
 
 .splash-logo {
     width: 300px;
     height: 350px;
-    filter: drop-shadow(0 0 20px var(--splash-glow));
+    filter: drop-shadow(0 0 20px rgba(64, 224, 208, 0.6));
     opacity: 0;
-    animation: logoFadeIn 1.5s ease-out forwards;
+    animation: logoAppear 1s ease-out forwards;
 }
 
-@keyframes logoFadeIn {
-    0% { 
-        opacity: 0; 
-        transform: scale(0.8);
-        filter: drop-shadow(0 0 0px var(--splash-glow));
-    }
-    100% { 
-        opacity: 1; 
-        transform: scale(1);
-        filter: drop-shadow(0 0 30px var(--splash-glow));
+@keyframes logoAppear {
+    to { 
+        opacity: 1;
+        filter: drop-shadow(0 0 30px rgba(64, 224, 208, 0.6));
     }
 }
 
-/* Logo fade out before split */
+/* Logo fade out */
 .splash-logo.fading-out {
-    animation: logoFadeOut 0.4s ease-out forwards;
+    animation: logoDisappear 0.3s ease-out forwards;
 }
 
-@keyframes logoFadeOut {
-    0% { 
-        opacity: 1; 
-        transform: scale(1);
-    }
-    100% { 
-        opacity: 0; 
-        transform: scale(1.1);
+@keyframes logoDisappear {
+    to { 
+        opacity: 0;
         filter: drop-shadow(0 0 50px white);
     }
 }
 
 /* =====================================================
-   LOGO PARTS - ANIMATIONS
+   6. RING ANIMATIONS - Normal rotation
+   SVG elements need explicit transform-origin in px
    ===================================================== */
 
-/* Outer ring rotation */
+/* Outer ring - rotates clockwise */
 .logo-ring-outer {
-    transform-origin: center;
-    animation: ringRotateOuter 3s linear infinite;
+    transform-origin: 150px 175px;
+    animation: ringOuter 4s linear infinite;
 }
 
-@keyframes ringRotateOuter {
+@keyframes ringOuter {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
-/* Middle ring - counter rotation */
+/* Middle ring - rotates counter-clockwise */
 .logo-ring-middle {
-    transform-origin: center;
-    animation: ringRotateMiddle 2.5s linear infinite;
+    transform-origin: 150px 175px;
+    animation: ringMiddle 3s linear infinite;
 }
 
-@keyframes ringRotateMiddle {
+@keyframes ringMiddle {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(-360deg); }
 }
 
-/* Inner ring */
+/* Inner ring - rotates clockwise faster */
 .logo-ring-inner {
-    transform-origin: center;
-    animation: ringRotateInner 2s linear infinite;
+    transform-origin: 150px 175px;
+    animation: ringInner 2s linear infinite;
 }
 
-@keyframes ringRotateInner {
+@keyframes ringInner {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
-/* Hexagon core glow */
+/* =====================================================
+   UNLOCK PHASE - Vault style ring rotation
+   ===================================================== */
+.splash-logo.unlocking .logo-ring-outer {
+    animation: vaultOuter 1.2s ease-in-out forwards;
+}
+
+.splash-logo.unlocking .logo-ring-middle {
+    animation: vaultMiddle 1.2s ease-in-out forwards;
+}
+
+.splash-logo.unlocking .logo-ring-inner {
+    animation: vaultInner 1.2s ease-in-out forwards;
+}
+
+@keyframes vaultOuter {
+    0% { transform: rotate(0deg); }
+    30% { transform: rotate(450deg); }
+    50% { transform: rotate(450deg); }
+    80% { transform: rotate(300deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes vaultMiddle {
+    0% { transform: rotate(0deg); }
+    35% { transform: rotate(-360deg); }
+    55% { transform: rotate(-360deg); }
+    85% { transform: rotate(-200deg); }
+    100% { transform: rotate(-270deg); }
+}
+
+@keyframes vaultInner {
+    0% { transform: rotate(0deg); }
+    20% { transform: rotate(120deg); }
+    35% { transform: rotate(120deg); }
+    55% { transform: rotate(240deg); }
+    70% { transform: rotate(240deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* =====================================================
+   7. ARM/NEEDLE ANIMATIONS
+   ===================================================== */
+
+/* Arms start in normal position */
+.logo-arm-top,
+.logo-arm-left,
+.logo-arm-right {
+    transform: translate(0, 0);
+}
+
+/* During unlock - arms shift outward */
+.splash-logo.unlocking .logo-arm-top {
+    animation: armTop 1s ease-out forwards;
+}
+
+.splash-logo.unlocking .logo-arm-left {
+    animation: armLeft 1s ease-out forwards;
+}
+
+.splash-logo.unlocking .logo-arm-right {
+    animation: armRight 1s ease-out forwards;
+}
+
+/* Top arm: straight up */
+@keyframes armTop {
+    0% { transform: translate(0, 0); }
+    100% { transform: translateY(-20px); }
+}
+
+/* Left arm: diagonal left-down */
+@keyframes armLeft {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-15px, 12px); }
+}
+
+/* Right arm: diagonal right-down */
+@keyframes armRight {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(15px, 12px); }
+}
+
+/* =====================================================
+   8. CORE GLOW
+   ===================================================== */
 .logo-core {
     animation: coreGlow 1.5s ease-in-out infinite;
 }
 
 @keyframes coreGlow {
-    0%, 100% { 
-        opacity: 0.8;
-        filter: drop-shadow(0 0 5px var(--splash-primary));
-    }
-    50% { 
-        opacity: 1;
-        filter: drop-shadow(0 0 20px var(--splash-primary));
-    }
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
 }
 
-/* Arms - expand outward during unlock */
-.logo-arm {
-    transition: transform 0.8s ease-out;
-}
-
-.logo-arm-top {
-    transform-origin: center bottom;
-}
-
-.logo-arm-left {
-    transform-origin: right center;
-}
-
-.logo-arm-right {
-    transform-origin: left center;
-}
-
-/* Unlock animation state */
-.splash-logo.unlocking .logo-arm-top {
-    animation: armExpandTop 1s ease-out forwards;
-}
-
-.splash-logo.unlocking .logo-arm-left {
-    animation: armExpandLeft 1s ease-out forwards;
-}
-
-.splash-logo.unlocking .logo-arm-right {
-    animation: armExpandRight 1s ease-out forwards;
-}
-
-@keyframes armExpandTop {
-    0% { transform: translateY(0) rotate(0deg); }
-    100% { transform: translateY(-30px) rotate(5deg); }
-}
-
-@keyframes armExpandLeft {
-    0% { transform: translate(0, 0) rotate(0deg); }
-    100% { transform: translate(-25px, 15px) rotate(-10deg); }
-}
-
-@keyframes armExpandRight {
-    0% { transform: translate(0, 0) rotate(0deg); }
-    100% { transform: translate(25px, 15px) rotate(10deg); }
-}
-
-/* Speed up rings during unlock */
-.splash-logo.unlocking .logo-ring-outer {
-    animation-duration: 0.5s;
-}
-
-.splash-logo.unlocking .logo-ring-middle {
-    animation-duration: 0.4s;
-}
-
-.splash-logo.unlocking .logo-ring-inner {
-    animation-duration: 0.3s;
-}
-
-/* Core burst during unlock */
 .splash-logo.unlocking .logo-core {
-    animation: coreBurst 1s ease-out forwards;
+    animation: coreBurst 0.8s ease-out forwards;
 }
 
 @keyframes coreBurst {
-    0% { 
-        opacity: 1;
-        filter: drop-shadow(0 0 10px var(--splash-primary));
-    }
-    50% { 
-        opacity: 1;
-        filter: drop-shadow(0 0 50px var(--splash-primary)) drop-shadow(0 0 80px white);
-    }
-    100% { 
-        opacity: 1;
-        filter: drop-shadow(0 0 30px var(--splash-primary));
-    }
+    50% { filter: drop-shadow(0 0 20px var(--splash-primary)); }
+    100% { filter: none; opacity: 1; }
 }
 
 /* =====================================================
-   CROSSHAIR / TARGETING LINES
+   9. DECORATIVE ELEMENTS (simplified)
    ===================================================== */
-.crosshair-lines {
+.corner-decoration {
     position: absolute;
-    width: 400px;
-    height: 400px;
+    width: 60px;
+    height: 60px;
     opacity: 0.3;
+    z-index: 6;
 }
 
-.crosshair-h,
-.crosshair-v {
+.corner-decoration::before,
+.corner-decoration::after {
+    content: '';
     position: absolute;
     background: var(--splash-primary);
 }
 
-.crosshair-h {
-    width: 100%;
-    height: 1px;
-    top: 50%;
-    animation: crosshairPulse 2s ease-in-out infinite;
-}
+.corner-tl { top: 20px; left: 20px; }
+.corner-tl::before { width: 30px; height: 2px; }
+.corner-tl::after { width: 2px; height: 30px; }
 
-.crosshair-v {
-    width: 1px;
-    height: 100%;
-    left: 50%;
-    animation: crosshairPulse 2s ease-in-out infinite 0.5s;
-}
+.corner-tr { top: 20px; right: 20px; }
+.corner-tr::before { width: 30px; height: 2px; right: 0; }
+.corner-tr::after { width: 2px; height: 30px; right: 0; }
 
-@keyframes crosshairPulse {
-    0%, 100% { opacity: 0.2; }
-    50% { opacity: 0.5; }
+.corner-bl { bottom: 20px; left: 20px; }
+.corner-bl::before { width: 30px; height: 2px; bottom: 0; }
+.corner-bl::after { width: 2px; height: 30px; bottom: 0; }
+
+.corner-br { bottom: 20px; right: 20px; }
+.corner-br::before { width: 30px; height: 2px; bottom: 0; right: 0; }
+.corner-br::after { width: 2px; height: 30px; bottom: 0; right: 0; }
+
+/* Crosshair - hidden, not needed */
+.crosshair-lines { display: none; }
+
+/* Glow behind logo - simplified */
+.splash-glow {
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(64, 224, 208, 0.3) 0%, transparent 70%);
+    z-index: 1;
 }
 
 /* =====================================================
-   SKIP BUTTON
+   10. LOADING TEXT
+   ===================================================== */
+.splash-text {
+    position: absolute;
+    bottom: 100px;
+    color: var(--splash-primary);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    opacity: 0;
+    animation: textAppear 0.5s ease-out 0.5s forwards;
+    z-index: 15;
+}
+
+.splash-text::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes textAppear {
+    to { opacity: 0.7; }
+}
+
+@keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+}
+
+/* Hide text when splitting */
+.splash-overlay.splitting .splash-text {
+    opacity: 0;
+}
+
+/* =====================================================
+   11. SKIP BUTTON
    ===================================================== */
 .splash-skip {
     position: absolute;
@@ -505,7 +422,7 @@
     letter-spacing: 2px;
     cursor: pointer;
     opacity: 0;
-    animation: skipFadeIn 0.5s ease-out 1s forwards;
+    animation: skipAppear 0.5s ease-out 1s forwards;
     transition: all 0.3s ease;
     z-index: 100;
 }
@@ -513,181 +430,103 @@
 .splash-skip:hover {
     background: var(--splash-primary);
     color: var(--splash-bg);
-    box-shadow: 0 0 20px var(--splash-glow);
 }
 
-@keyframes skipFadeIn {
-    0% { opacity: 0; transform: translateY(10px); }
-    100% { opacity: 0.7; transform: translateY(0); }
+@keyframes skipAppear {
+    to { opacity: 0.7; }
 }
 
-/* Hide skip button during split */
-.splash-overlay.splitting .splash-skip,
-.splash-overlay.light-active .splash-skip {
+.splash-overlay.splitting .splash-skip {
     opacity: 0 !important;
     pointer-events: none;
 }
 
 /* =====================================================
-   LOADING TEXT
+   12. WHITE OVERLAY + BRANDING
    ===================================================== */
-.splash-text {
-    position: absolute;
-    bottom: 100px;
-    color: var(--splash-primary);
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 4px;
+.white-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
     opacity: 0;
-    animation: textFadeIn 0.5s ease-out 0.5s forwards;
-    z-index: 15;
+    z-index: 99998;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.splash-text::after {
-    content: '';
-    animation: loadingDots 1.5s steps(4, end) infinite;
+/* When active, white bg is visible (revealed by split) */
+.white-overlay.visible {
+    opacity: 1;
 }
 
-@keyframes textFadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 0.8; }
+/* Fade out to reveal app */
+.white-overlay.fading {
+    animation: whiteFadeOut 0.8s ease-out forwards;
 }
 
-@keyframes loadingDots {
-    0% { content: ''; }
-    25% { content: '.'; }
-    50% { content: '..'; }
-    75% { content: '...'; }
-    100% { content: ''; }
+@keyframes whiteFadeOut {
+    to { opacity: 0; }
 }
 
-/* Hide text during split */
-.splash-overlay.light-active .splash-text {
-    animation: textFadeOut 0.3s ease-out forwards;
+/* Branding container */
+.branding-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 3vw;
 }
 
-@keyframes textFadeOut {
-    0% { opacity: 0.8; }
-    100% { opacity: 0; }
+.branding-logo {
+    width: 10vw;
+    min-width: 60px;
+    max-width: 120px;
+    height: auto;
 }
 
-/* =====================================================
-   CORNER DECORATIONS
-   ===================================================== */
-.corner-decoration {
-    position: absolute;
-    width: 80px;
-    height: 80px;
-    opacity: 0.4;
-    z-index: 20;
+.branding-text {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    font-size: 10vw;
+    font-weight: 300;
+    letter-spacing: 0.3vw;
+    display: flex;
+    align-items: center;
 }
 
-.corner-decoration::before,
-.corner-decoration::after {
-    content: '';
-    position: absolute;
-    background: var(--splash-primary);
+.branding-text .text-cogyn {
+    color: #000000;
 }
 
-.corner-tl {
-    top: 20px;
-    left: 20px;
-}
-.corner-tl::before {
-    width: 40px;
-    height: 2px;
-    top: 0;
-    left: 0;
-}
-.corner-tl::after {
-    width: 2px;
-    height: 40px;
-    top: 0;
-    left: 0;
+.branding-text .text-a {
+    color: #40E0D0;
 }
 
-.corner-tr {
-    top: 20px;
-    right: 20px;
-}
-.corner-tr::before {
-    width: 40px;
-    height: 2px;
-    top: 0;
-    right: 0;
-}
-.corner-tr::after {
-    width: 2px;
-    height: 40px;
-    top: 0;
-    right: 0;
-}
-
-.corner-bl {
-    bottom: 20px;
-    left: 20px;
-}
-.corner-bl::before {
-    width: 40px;
-    height: 2px;
-    bottom: 0;
-    left: 0;
-}
-.corner-bl::after {
-    width: 2px;
-    height: 40px;
-    bottom: 0;
-    left: 0;
-}
-
-.corner-br {
-    bottom: 20px;
-    right: 20px;
-}
-.corner-br::before {
-    width: 40px;
-    height: 2px;
-    bottom: 0;
-    right: 0;
-}
-.corner-br::after {
-    width: 2px;
-    height: 40px;
-    bottom: 0;
-    right: 0;
+.branding-text .text-i {
+    color: #1E6B6B;
 }
 
 /* =====================================================
-   PARTICLE EFFECTS
+   13. APP REVEAL (simple fade)
    ===================================================== */
-.particle {
-    position: absolute;
-    width: 4px;
-    height: 4px;
-    background: var(--splash-primary);
-    border-radius: 50%;
+.app-layout.hidden {
     opacity: 0;
-    animation: particleFloat 3s ease-in-out infinite;
 }
 
-@keyframes particleFloat {
-    0%, 100% {
-        opacity: 0;
-        transform: translateY(0) scale(0);
-    }
-    20% {
-        opacity: 1;
-        transform: translateY(-20px) scale(1);
-    }
-    80% {
-        opacity: 0.5;
-        transform: translateY(-80px) scale(0.5);
-    }
+.app-layout.revealing {
+    animation: appReveal 0.6s ease-out forwards;
+}
+
+@keyframes appReveal {
+    to { opacity: 1; }
 }
 
 /* =====================================================
-   RESPONSIVE
+   14. RESPONSIVE
    ===================================================== */
 @media (max-width: 768px) {
     .splash-logo {
@@ -696,31 +535,26 @@
     }
     
     .splash-glow {
-        width: 400px;
-        height: 400px;
+        width: 300px;
+        height: 300px;
     }
     
-    .splash-text {
-        font-size: 11px;
-        letter-spacing: 2px;
+    .branding-text {
+        font-size: 12vw;
     }
     
-    .splash-skip {
-        bottom: 20px;
-        right: 20px;
-        padding: 8px 16px;
-        font-size: 10px;
+    .branding-logo {
+        width: 12vw;
     }
 }
 
 /* =====================================================
-   FINAL FADE OUT (for skip)
+   15. UTILITY - FADE OUT OVERLAY
    ===================================================== */
 .splash-overlay.fade-out {
-    animation: overlayFadeOut 0.5s ease-out forwards;
+    animation: overlayFadeOut 0.3s ease-out forwards;
 }
 
 @keyframes overlayFadeOut {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
+    to { opacity: 0; }
 }

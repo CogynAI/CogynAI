@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Auth Test</title>
+    <script src="/config/aws-config.js"></script>
+    <script src="/auth/auth-service.js"></script>
+</head>
+<body>
+    <h1>Frontend Auth Test</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        async function test() {
+            output.innerHTML = '<h2>Testing Auth Service...</h2>';
+
+            try {
+                const authService = new AuthService();
+
+                output.innerHTML += `<p>Auth Mode: ${authService.authMode}</p>`;
+                output.innerHTML += `<p>API Base URL: ${authService.apiBaseUrl}</p>`;
+                output.innerHTML += `<p>Use Backend: ${authService.useBackend}</p>`;
+
+                // Test Register
+                output.innerHTML += '<h3>Testing Register...</h3>';
+
+                const email = 'frontendtest_' + Date.now() + '@example.com';
+                const password = 'Test123!';
+                const name = 'Frontend Test';
+
+                output.innerHTML += `<p>Registering: ${email}</p>`;
+
+                // Zeige die exakte URL die aufgerufen wird
+                const testUrl = `${authService.apiBaseUrl}/api/auth/register.php`;
+                output.innerHTML += `<p><strong>URL:</strong> ${testUrl}</p>`;
+
+                // Teste direkt mit fetch
+                const response = await fetch(testUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                output.innerHTML += `<p><strong>Response Status:</strong> ${response.status}</p>`;
+                output.innerHTML += `<p><strong>Response Headers:</strong></p>`;
+                output.innerHTML += '<pre>' + JSON.stringify([...response.headers.entries()], null, 2) + '</pre>';
+
+                const contentType = response.headers.get('content-type');
+                output.innerHTML += `<p><strong>Content-Type:</strong> ${contentType}</p>`;
+
+                const text = await response.text();
+                output.innerHTML += `<p><strong>Response Body (first 500 chars):</strong></p>`;
+                output.innerHTML += '<pre>' + text.substring(0, 500) + '</pre>';
+
+                if (contentType && contentType.includes('application/json')) {
+                    const data = JSON.parse(text);
+                    output.innerHTML += '<p style="color: green;">✅ Valid JSON received!</p>';
+                    output.innerHTML += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    output.innerHTML += '<p style="color: red;">❌ NOT JSON - received HTML or other format</p>';
+                }
+
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;"><strong>ERROR:</strong> ${error.message}</p>`;
+                output.innerHTML += '<pre>' + error.stack + '</pre>';
+            }
+        }
+
+        test();
+    </script>
+</body>
+</html>

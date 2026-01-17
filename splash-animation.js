@@ -1,330 +1,215 @@
 /* =====================================================
-   MATRIX SPLASH ANIMATION CONTROLLER
-   Handles timing, matrix effect, and unlock sequence
-   with smooth horizontal split and blur reveal
+   SPLASH ANIMATION CONTROLLER - CLEAN REWRITE
+   Simple, linear animation phases
    ===================================================== */
 
 (function() {
     'use strict';
     
-    // Configuration
-    const CONFIG = {
-        // Timing (in milliseconds) - Total: ~7 seconds
-        PHASE1_DURATION: 1500,    // Logo fade in
-        PHASE2_DURATION: 1500,    // Unlock animation
-        PHASE3_DURATION: 1000,    // Light line + horizontal split
-        PHASE4_DURATION: 1200,    // White transition
-        PHASE5_DURATION: 2000,    // Blur reveal
-        
-        // Matrix effect
-        MATRIX_COLUMNS: 30,
-        MATRIX_CHARS: '01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン',
-        
-        // Particles
-        PARTICLE_COUNT: 20,
-        
-        // localStorage key for skip preference
-        STORAGE_KEY: 'cogyn_splash_seen'
+    // ==========================================
+    // CONFIGURATION
+    // ==========================================
+    const TIMING = {
+        LOGO_APPEAR: 1500,      // Phase 1: Logo fades in
+        UNLOCK: 1200,           // Phase 2: Arms shift, rings rotate
+        LIGHT_LINE: 300,        // Phase 3: Light line appears
+        SPLIT: 600,             // Phase 4: Screen splits open
+        BRANDING: 2500,         // Phase 5: Branding visible
+        FADE_OUT: 800           // Phase 6: Fade to app
     };
     
-    // Splash Animation Controller
-    class SplashAnimation {
+    // ==========================================
+    // MAIN CONTROLLER
+    // ==========================================
+    class SplashController {
         constructor() {
-            this.overlay = null;
-            this.logo = null;
-            this.whiteOverlay = null;
-            this.appLayout = null;
-            this.isSkipped = false;
-            this.currentPhase = 0;
+            this.elements = {};
+            this.skipped = false;
         }
         
+        // Initialize and start
         init() {
-            this.overlay = document.getElementById('splash-overlay');
-            this.logo = document.querySelector('.splash-logo');
-            this.whiteOverlay = document.querySelector('.white-overlay');
-            this.appLayout = document.querySelector('.app-layout');
+            // Get elements
+            this.elements = {
+                overlay: document.getElementById('splash-overlay'),
+                logo: document.querySelector('.splash-logo'),
+                whiteOverlay: document.querySelector('.white-overlay'),
+                appLayout: document.querySelector('.app-layout')
+            };
             
-            if (!this.overlay) {
-                console.warn('[Splash] No splash overlay found');
+            // Check if splash exists
+            if (!this.elements.overlay) {
+                console.warn('[Splash] No overlay found');
                 return;
             }
             
-            // Ensure app layout starts blurred
-            if (this.appLayout) {
-                this.appLayout.classList.add('splash-blur');
+            // Hide app initially
+            if (this.elements.appLayout) {
+                this.elements.appLayout.classList.add('hidden');
             }
             
-            // Check if user wants to skip
-            // Uncomment below to enable skip after first visit
-            // if (localStorage.getItem(CONFIG.STORAGE_KEY)) {
-            //     this.skip();
-            //     return;
-            // }
+            // Setup matrix effect (simple version)
+            this.createMatrixColumns();
             
-            this.setupMatrixEffect();
-            this.setupParticles();
-            this.setupSkipButton();
-            this.startAnimation();
+            // Setup skip
+            this.setupSkip();
+            
+            // Start animation sequence
+            this.runPhases();
         }
         
-        setupMatrixEffect() {
-            const matrixContainers = document.querySelectorAll('.matrix-bg');
+        // Create matrix rain columns
+        createMatrixColumns() {
+            const containers = document.querySelectorAll('.matrix-bg');
+            const chars = '01アイウエオカキクケコサシスセソ';
             
-            matrixContainers.forEach(container => {
-                for (let i = 0; i < CONFIG.MATRIX_COLUMNS; i++) {
-                    const column = document.createElement('div');
-                    column.className = 'matrix-column';
-                    column.style.left = `${(i / CONFIG.MATRIX_COLUMNS) * 100}%`;
-                    column.style.animationDuration = `${3 + Math.random() * 4}s`;
-                    column.style.animationDelay = `${Math.random() * 2}s`;
-                    column.style.opacity = 0.3 + Math.random() * 0.5;
+            containers.forEach(container => {
+                for (let i = 0; i < 25; i++) {
+                    const col = document.createElement('div');
+                    col.className = 'matrix-column';
+                    col.style.left = `${i * 4}%`;
+                    col.style.animationDuration = `${3 + Math.random() * 3}s`;
+                    col.style.animationDelay = `${Math.random() * 2}s`;
                     
-                    // Generate random matrix text
                     let text = '';
-                    const length = 15 + Math.floor(Math.random() * 20);
-                    for (let j = 0; j < length; j++) {
-                        text += CONFIG.MATRIX_CHARS[Math.floor(Math.random() * CONFIG.MATRIX_CHARS.length)];
+                    for (let j = 0; j < 20; j++) {
+                        text += chars[Math.floor(Math.random() * chars.length)];
                     }
-                    column.textContent = text;
-                    
-                    container.appendChild(column);
+                    col.textContent = text;
+                    container.appendChild(col);
                 }
             });
         }
         
-        setupParticles() {
-            const logoContainer = document.querySelector('.logo-container');
-            if (!logoContainer) return;
-            
-            for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                particle.style.left = `${30 + Math.random() * 40}%`;
-                particle.style.top = `${30 + Math.random() * 40}%`;
-                particle.style.animationDelay = `${Math.random() * 3}s`;
-                particle.style.animationDuration = `${2 + Math.random() * 2}s`;
-                logoContainer.appendChild(particle);
-            }
-        }
-        
-        setupSkipButton() {
+        // Setup skip functionality
+        setupSkip() {
             const skipBtn = document.querySelector('.splash-skip');
             if (skipBtn) {
-                skipBtn.addEventListener('click', () => this.skip());
+                skipBtn.onclick = () => this.skip();
             }
             
-            // Also allow spacebar or Enter to skip
-            this.keyHandler = (e) => {
-                if ((e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') && !this.isSkipped) {
+            document.addEventListener('keydown', (e) => {
+                if ((e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') && !this.skipped) {
                     e.preventDefault();
                     this.skip();
                 }
-            };
-            document.addEventListener('keydown', this.keyHandler);
+            });
         }
         
-        startAnimation() {
-            console.log('[Splash] Starting animation sequence');
-            this.currentPhase = 1;
+        // Run animation phases in sequence
+        async runPhases() {
+            const { overlay, logo, whiteOverlay, appLayout } = this.elements;
             
-            // Phase 1: Logo appears (handled by CSS)
-            setTimeout(() => {
-                if (this.isSkipped) return;
-                this.startUnlockSequence();
-            }, CONFIG.PHASE1_DURATION);
+            // Phase 1: Logo appears (CSS handles this)
+            console.log('[Splash] Phase 1: Logo appearing');
+            await this.wait(TIMING.LOGO_APPEAR);
+            if (this.skipped) return;
+            
+            // Phase 2: Unlock sequence
+            console.log('[Splash] Phase 2: Unlock');
+            if (logo) logo.classList.add('unlocking');
+            await this.wait(TIMING.UNLOCK);
+            if (this.skipped) return;
+            
+            // Phase 3: Light line + fade logo
+            console.log('[Splash] Phase 3: Light line');
+            if (logo) logo.classList.add('fading-out');
+            if (overlay) overlay.classList.add('light-active');
+            await this.wait(TIMING.LIGHT_LINE);
+            if (this.skipped) return;
+            
+            // Phase 4: Make white overlay visible, then split
+            console.log('[Splash] Phase 4: Split revealing branding');
+            if (whiteOverlay) whiteOverlay.classList.add('visible');
+            if (overlay) overlay.classList.add('splitting');
+            await this.wait(TIMING.SPLIT);
+            if (this.skipped) return;
+            
+            // Phase 5: Branding stays visible
+            console.log('[Splash] Phase 5: Branding displayed');
+            // Hide the splash overlay completely
+            if (overlay) overlay.style.display = 'none';
+            await this.wait(TIMING.BRANDING);
+            if (this.skipped) return;
+            
+            // Phase 6: Fade out branding, reveal app
+            console.log('[Splash] Phase 6: Reveal app');
+            this.revealApp();
         }
         
-        startUnlockSequence() {
-            console.log('[Splash] Phase 2: Unlock sequence');
-            this.currentPhase = 2;
+        // Reveal the main application
+        revealApp() {
+            const { whiteOverlay, appLayout } = this.elements;
             
-            if (this.logo) {
-                this.logo.classList.add('unlocking');
+            if (whiteOverlay) {
+                whiteOverlay.classList.remove('visible');
+                whiteOverlay.classList.add('fading');
             }
             
-            // After unlock animation, start light line
-            setTimeout(() => {
-                if (this.isSkipped) return;
-                this.startLightLine();
-            }, CONFIG.PHASE2_DURATION);
+            if (appLayout) {
+                appLayout.classList.remove('hidden');
+                appLayout.classList.add('revealing');
+            }
+            
+            // Cleanup after fade
+            setTimeout(() => this.cleanup(), TIMING.FADE_OUT);
         }
         
-        startLightLine() {
-            console.log('[Splash] Phase 3: Light line + horizontal split');
-            this.currentPhase = 3;
-            
-            // Fade out logo
-            if (this.logo) {
-                this.logo.classList.add('fading-out');
-            }
-            
-            // Activate light line
-            if (this.overlay) {
-                this.overlay.classList.add('light-active');
-            }
-            
-            // Start split after light line expands
-            setTimeout(() => {
-                if (this.isSkipped) return;
-                this.startHorizontalSplit();
-            }, 400);
-        }
-        
-        startHorizontalSplit() {
-            console.log('[Splash] Horizontal split');
-            
-            if (this.overlay) {
-                this.overlay.classList.add('splitting');
-            }
-            
-            // Start white transition after split begins
-            setTimeout(() => {
-                if (this.isSkipped) return;
-                this.startWhiteTransition();
-            }, CONFIG.PHASE3_DURATION - 400);
-        }
-        
-        startWhiteTransition() {
-            console.log('[Splash] Phase 4: White transition');
-            this.currentPhase = 4;
-            
-            if (this.whiteOverlay) {
-                this.whiteOverlay.classList.add('active');
-            }
-            
-            // Start blur reveal after white is visible
-            setTimeout(() => {
-                if (this.isSkipped) return;
-                this.startBlurReveal();
-            }, CONFIG.PHASE4_DURATION * 0.6);
-        }
-        
-        startBlurReveal() {
-            console.log('[Splash] Phase 5: Blur reveal');
-            this.currentPhase = 5;
-            
-            // Remove splash overlay
-            if (this.overlay) {
-                this.overlay.style.display = 'none';
-            }
-            
-            // Start fading out white overlay
-            if (this.whiteOverlay) {
-                this.whiteOverlay.classList.remove('active');
-                this.whiteOverlay.classList.add('fading');
-            }
-            
-            // Start revealing the main content
-            if (this.appLayout) {
-                this.appLayout.classList.remove('splash-blur');
-                this.appLayout.classList.add('revealing');
-            }
-            
-            // Final cleanup after reveal completes
-            setTimeout(() => {
-                this.cleanup();
-            }, CONFIG.PHASE5_DURATION);
-        }
-        
+        // Skip animation
         skip() {
-            if (this.isSkipped) return;
-            this.isSkipped = true;
+            if (this.skipped) return;
+            this.skipped = true;
+            console.log('[Splash] Skipped');
             
-            console.log('[Splash] Animation skipped at phase', this.currentPhase);
+            const { overlay, whiteOverlay, appLayout } = this.elements;
             
-            // Store preference (uncomment to remember skip)
-            // localStorage.setItem(CONFIG.STORAGE_KEY, 'true');
-            
-            // Remove key handler
-            if (this.keyHandler) {
-                document.removeEventListener('keydown', this.keyHandler);
+            // Quickly hide everything
+            if (overlay) {
+                overlay.classList.add('fade-out');
             }
             
-            // Quick transition based on current phase
-            if (this.currentPhase < 4) {
-                // Still in logo/split phases - do quick fade
-                if (this.overlay) {
-                    this.overlay.classList.add('fade-out');
-                }
-                
-                // Show white briefly then reveal
-                if (this.whiteOverlay) {
-                    this.whiteOverlay.style.transition = 'opacity 0.3s';
-                    this.whiteOverlay.style.opacity = '1';
-                    
-                    setTimeout(() => {
-                        this.whiteOverlay.style.opacity = '0';
-                    }, 200);
-                }
-                
-                // Quick reveal of main content
-                if (this.appLayout) {
-                    this.appLayout.classList.remove('splash-blur');
-                    this.appLayout.style.transition = 'filter 0.5s, opacity 0.5s, transform 0.5s';
-                    this.appLayout.style.filter = 'blur(0)';
-                    this.appLayout.style.opacity = '1';
-                    this.appLayout.style.transform = 'scale(1)';
-                }
-                
-                setTimeout(() => this.cleanup(), 500);
-            } else {
-                // Already in white/reveal phase - just speed up
-                if (this.whiteOverlay) {
-                    this.whiteOverlay.style.transition = 'opacity 0.3s';
-                    this.whiteOverlay.style.opacity = '0';
-                }
-                
-                if (this.appLayout) {
-                    this.appLayout.classList.remove('splash-blur', 'revealing');
-                    this.appLayout.style.filter = 'blur(0)';
-                    this.appLayout.style.opacity = '1';
-                    this.appLayout.style.transform = 'scale(1)';
+            if (whiteOverlay) {
+                whiteOverlay.style.transition = 'opacity 0.2s';
+                whiteOverlay.style.opacity = '0';
+            }
+            
+            if (appLayout) {
+                appLayout.classList.remove('hidden');
+                appLayout.style.opacity = '1';
                 }
                 
                 setTimeout(() => this.cleanup(), 300);
-            }
         }
         
+        // Clean up DOM
         cleanup() {
             console.log('[Splash] Cleanup');
             
-            // Remove overlay from DOM
-            if (this.overlay) {
-                this.overlay.remove();
+            const { overlay, whiteOverlay, appLayout } = this.elements;
+            
+            if (overlay) overlay.remove();
+            if (whiteOverlay) whiteOverlay.remove();
+            
+            if (appLayout) {
+                appLayout.classList.remove('hidden', 'revealing');
+                appLayout.style.opacity = '';
             }
             
-            // Remove white overlay
-            if (this.whiteOverlay) {
-                this.whiteOverlay.remove();
-            }
-            
-            // Clean up app layout classes
-            if (this.appLayout) {
-                this.appLayout.classList.remove('splash-blur', 'revealing');
-                this.appLayout.style.filter = '';
-                this.appLayout.style.opacity = '';
-                this.appLayout.style.transform = '';
-                this.appLayout.style.transition = '';
-            }
-            
-            // Remove key handler
-            if (this.keyHandler) {
-                document.removeEventListener('keydown', this.keyHandler);
-            }
-            
-            // Dispatch event for any listeners
             window.dispatchEvent(new CustomEvent('splashComplete'));
+        }
+        
+        // Promise-based wait
+        wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
     }
     
-    // Initialize when DOM is ready
+    // ==========================================
+    // START
+    // ==========================================
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            const splash = new SplashAnimation();
-            splash.init();
-        });
+        document.addEventListener('DOMContentLoaded', () => new SplashController().init());
     } else {
-        const splash = new SplashAnimation();
-        splash.init();
+        new SplashController().init();
     }
 })();

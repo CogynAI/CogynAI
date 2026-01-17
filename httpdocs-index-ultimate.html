@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- HTTPS erzwingen via Meta-Tag -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+
+    <!-- Titel -->
+    <title>Cogyn - Weiterleitung...</title>
+    <link rel="icon" type="image/png" href="/public/logo.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0D3D3D 0%, #1a5f5f 100%);
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #40E0D0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: #0D3D3D;
+        }
+
+        .spinner {
+            border: 4px solid rgba(64, 224, 208, 0.3);
+            border-top: 4px solid #40E0D0;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 16px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 12px;
+            background: rgba(64, 224, 208, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        .buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #40E0D0;
+            color: #0D3D3D;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            background: #5FFFF5;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(64, 224, 208, 0.4);
+        }
+
+        .info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .warning.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">C</div>
+        <div class="spinner"></div>
+        <h1>Weiterleitung zu Cogyn...</h1>
+        <p>Einen Moment bitte</p>
+
+        <div class="status" id="status">
+            Prüfe Verbindung...
+        </div>
+
+        <div class="warning" id="warning">
+            <strong>⚠️ Hinweis:</strong><br>
+            Du wirst zu HTTPS weitergeleitet.<br>
+            Bitte verwende in Zukunft: <code>https://cogyn.app</code>
+        </div>
+
+        <div class="buttons">
+            <a href="https://cogyn.app/public/login.html" class="btn">🔐 Zur Anmeldung</a>
+            <a href="https://cogyn.app/public/index.html" class="btn">📚 Zur App</a>
+        </div>
+
+        <div class="info">
+            <p><strong>💡 Tipp:</strong> Speichere <code>https://cogyn.app</code> als Lesezeichen</p>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const warningEl = document.getElementById('warning');
+
+        // Verhindere Redirect-Loops
+        const MAX_REDIRECTS = 3;
+        const REDIRECT_KEY = 'cogyn_redirect_count';
+        const REDIRECT_TIMESTAMP = 'cogyn_redirect_time';
+
+        function getRedirectCount() {
+            const count = sessionStorage.getItem(REDIRECT_KEY);
+            const timestamp = sessionStorage.getItem(REDIRECT_TIMESTAMP);
+            const now = Date.now();
+
+            // Reset nach 1 Minute
+            if (timestamp && (now - parseInt(timestamp)) > 60000) {
+                sessionStorage.removeItem(REDIRECT_KEY);
+                sessionStorage.removeItem(REDIRECT_TIMESTAMP);
+                return 0;
+            }
+
+            return count ? parseInt(count) : 0;
+        }
+
+        function incrementRedirectCount() {
+            const count = getRedirectCount() + 1;
+            sessionStorage.setItem(REDIRECT_KEY, count.toString());
+            sessionStorage.setItem(REDIRECT_TIMESTAMP, Date.now().toString());
+            return count;
+        }
+
+        function smartRedirect() {
+            console.log('[Cogyn Redirect] Starting...');
+            console.log('[Cogyn Redirect] Current URL:', window.location.href);
+            console.log('[Cogyn Redirect] Protocol:', window.location.protocol);
+            console.log('[Cogyn Redirect] Host:', window.location.host);
+
+            // Prüfe Redirect-Count
+            const redirectCount = getRedirectCount();
+            console.log('[Cogyn Redirect] Redirect count:', redirectCount);
+
+            if (redirectCount >= MAX_REDIRECTS) {
+                console.error('[Cogyn Redirect] Max redirects reached, stopping');
+                statusEl.textContent = '⚠️ Zu viele Weiterleitungen. Bitte manuell fortfahren.';
+                statusEl.style.background = 'rgba(255, 0, 0, 0.3)';
+                return;
+            }
+
+            incrementRedirectCount();
+
+            // Prüfe ob HTTPS
+            const isHTTPS = window.location.protocol === 'https:';
+            const isCorrectHost = window.location.hostname === 'cogyn.app' || window.location.hostname === 'www.cogyn.app';
+
+            console.log('[Cogyn Redirect] Is HTTPS:', isHTTPS);
+            console.log('[Cogyn Redirect] Is correct host:', isCorrectHost);
+
+            // Wenn nicht HTTPS, zeige Warnung
+            if (!isHTTPS) {
+                warningEl.classList.add('show');
+                statusEl.textContent = 'Leite zu HTTPS weiter...';
+            }
+
+            // Prüfe Auth-Token
+            let hasToken = false;
+            try {
+                hasToken = !!localStorage.getItem('auth_token');
+                console.log('[Cogyn Redirect] Has auth token:', hasToken);
+            } catch (e) {
+                console.warn('[Cogyn Redirect] Cannot access localStorage:', e);
+            }
+
+            // Entscheide Ziel-URL
+            let targetUrl;
+            if (hasToken) {
+                targetUrl = 'https://cogyn.app/public/index.html';
+                statusEl.textContent = 'Angemeldet - Leite zur App weiter...';
+            } else {
+                targetUrl = 'https://cogyn.app/public/login.html';
+                statusEl.textContent = 'Leite zur Anmeldung weiter...';
+            }
+
+            console.log('[Cogyn Redirect] Target URL:', targetUrl);
+
+            // Weiterleitung ausführen
+            setTimeout(() => {
+                console.log('[Cogyn Redirect] Executing redirect...');
+                window.location.replace(targetUrl);
+            }, isHTTPS ? 500 : 1500);
+        }
+
+        // Starte Redirect
+        try {
+            smartRedirect();
+        } catch (error) {
+            console.error('[Cogyn Redirect] Error:', error);
+            statusEl.textContent = '❌ Fehler beim Weiterleiten';
+            statusEl.style.background = 'rgba(255, 0, 0, 0.3)';
+        }
+
+        // Fallback: Bei /defaultsite immer zu login.html
+        if (window.location.pathname.includes('defaultsite')) {
+            console.log('[Cogyn Redirect] Defaultsite detected, redirecting to login');
+            setTimeout(() => {
+                window.location.replace('https://cogyn.app/public/login.html');
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

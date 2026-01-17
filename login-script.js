@@ -18,20 +18,24 @@ class LoginManager {
         this.setupFormListeners();
         this.setupPasswordToggles();
         this.setupPasswordStrength();
-        this.setupBirthDateField();
+        this.setupAgeField();
     }
     
-    setupBirthDateField() {
-        // Set maximum date to today (can't be born in the future)
-        const birthDateInput = document.getElementById('register-birthdate');
-        if (birthDateInput) {
-            const today = new Date();
-            const maxDate = today.toISOString().split('T')[0];
-            birthDateInput.setAttribute('max', maxDate);
-            
-            // Set minimum date to 100 years ago
-            const minDate = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
-            birthDateInput.setAttribute('min', minDate.toISOString().split('T')[0]);
+    setupAgeField() {
+        // Age field validation is handled by HTML min/max attributes
+        const ageInput = document.getElementById('register-age');
+        if (ageInput) {
+            // Focus-Verhalten für bessere UX
+            ageInput.addEventListener('focus', () => {
+                if (!ageInput.value) {
+                    ageInput.placeholder = '';
+                }
+            });
+            ageInput.addEventListener('blur', () => {
+                if (!ageInput.value) {
+                    ageInput.placeholder = 'z.B. 17';
+                }
+            });
         }
     }
     
@@ -230,7 +234,7 @@ class LoginManager {
         const email = document.getElementById('register-email').value.trim();
         const password = document.getElementById('register-password').value;
         const passwordConfirm = document.getElementById('register-password-confirm').value;
-        const birthDate = document.getElementById('register-birthdate').value;
+        const ageInput = document.getElementById('register-age').value;
         const acceptTerms = document.getElementById('accept-terms').checked;
         
         // Validation
@@ -254,22 +258,15 @@ class LoginManager {
             return;
         }
         
-        if (!birthDate) {
-            this.showMessage('Bitte gib dein Geburtsdatum ein.', 'error');
+        // Validate age
+        const age = parseInt(ageInput, 10);
+        if (!ageInput || isNaN(age)) {
+            this.showMessage('Bitte gib dein Alter ein.', 'error');
             return;
         }
         
-        // Validate age (must be between 5 and 100 years old)
-        const birthDateObj = new Date(birthDate);
-        const today = new Date();
-        let age = today.getFullYear() - birthDateObj.getFullYear();
-        const monthDiff = today.getMonth() - birthDateObj.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
-            age--;
-        }
-        
-        if (age < 5 || age > 100) {
-            this.showMessage('Bitte gib ein gültiges Geburtsdatum ein (Alter zwischen 5 und 100 Jahren).', 'error');
+        if (age < 10 || age > 99) {
+            this.showMessage('Bitte gib ein gültiges Alter ein (zwischen 10 und 99 Jahren).', 'error');
             return;
         }
         
@@ -290,7 +287,7 @@ class LoginManager {
         try {
             const result = await this.authService.signUp(email, password, { 
                 name: name,
-                birthDate: birthDate
+                age: age
             });
             
             if (result.success) {
